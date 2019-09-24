@@ -53,6 +53,27 @@ def csv_map(source_csv_path, field_order, row_remap_func, output_writer):
 
 
 
+def save_columns(source_csv_path, column_names, field_row, output_csv_path):
+    source_csv_file = open(PATH)
+    source_csv = csv.reader(source_csv_file, delimiter=',')
+    def row_remap_func(row_num, row_dict):
+        if row_num == field_row:
+            return None
+        out = {}
+        for col in column_names:
+            if col in row_dict:
+                out[col] = row_dict[col]
+        return out
+
+    input_field_ordering = 0
+    for row in source_csv:
+        if input_field_ordering == field_row:
+            input_field_ordering = row
+            break
+        input_field_ordering += 1
+    output_writer = open(output_csv_path, "w")
+    csv_map(source_csv, input_field_ordering, row_remap_func, output_writer)
+
 
 
 
@@ -62,17 +83,21 @@ if __name__ == "__main__":
 
     PATH = "C:/Users/peter/OneDrive/Desktop/ML/CDS/stanford_medical/datasets/analytic_data2017.csv"
     SAVE_PATH = "C:/Users/peter/OneDrive/Desktop/ML/CDS/stanford_medical/datasets/analytic_data2017_remapped.csv"
-    source_csv_file = open(PATH)
+    save_columns(PATH, ["State Abbreviation", "Premature death CI high", "Release Year"], 0, SAVE_PATH)
+    '''source_csv_file = open(PATH)
     source_csv = csv.reader(source_csv_file, delimiter=',')
     field_order = None
     for row in source_csv:
         field_order = row
         #print("row: ", row)
         break
-
+    #only includes points from Alabama, and only includes certain fields
     def row_remap_func(row_num, row_dict):
         if row_num < 2:
             return None
+        if row_dict["State Abbreviation"] != "AL":
+            return None
+
         return {
             "state": row_dict["State Abbreviation"],
             "Premature death CI high": row_dict["Premature death CI high"]
@@ -80,4 +105,4 @@ if __name__ == "__main__":
 
     output_writer = open(SAVE_PATH, "w")
 
-    csv_map(source_csv, field_order, row_remap_func, output_writer)
+    csv_map(source_csv, field_order, row_remap_func, output_writer)'''
