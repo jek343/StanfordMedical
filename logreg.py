@@ -12,7 +12,7 @@ with open(data_path) as dataset:
      first_row = next(data_reader)
      for row in data_reader:
          row = np.array(row)
-         blank = np.union1d(blank, np.where(row == ""))
+         blank = np.union1d(blank, np.where(row == "")[0])
      not_blank = np.setdiff1d(np.arange(len(first_row)), blank)
      e_cols = np.take(first_row, not_blank)
 
