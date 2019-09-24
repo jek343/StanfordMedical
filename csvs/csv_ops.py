@@ -25,7 +25,7 @@ def csv_fold(source_csv, f, x0):
     return out
 
 def load_csv(source_csv_path):
-    source_csv_file = open(PATH)
+    source_csv_file = open(source_csv_path)
     return csv.reader(source_csv_file, delimiter=',')
 
 #row remap func returns None if the row shouldn't be included.
@@ -54,15 +54,18 @@ def csv_map(source_csv_path, field_order, row_remap_func, output_writer):
 
 
 def save_columns(source_csv_path, column_names, field_row, output_csv_path):
-    source_csv_file = open(PATH)
+    source_csv_file = open(source_csv_path)
     source_csv = csv.reader(source_csv_file, delimiter=',')
     def row_remap_func(row_num, row_dict):
-        if row_num == field_row:
+        if row_num == field_row or row_num == field_row+1:
+            return None
+        if row_dict["Premature age-adjusted mortality denominator"]=="" or row_dict["Premature age-adjusted mortality numerator"]=="":
             return None
         out = {}
         for col in column_names:
             if col in row_dict:
                 out[col] = row_dict[col]
+        out["Mortality Ratio"] = str(float(row_dict["Premature age-adjusted mortality numerator"]) / float(row_dict["Premature age-adjusted mortality denominator"]))
         return out
 
     input_field_ordering = 0
@@ -72,7 +75,7 @@ def save_columns(source_csv_path, column_names, field_row, output_csv_path):
             break
         input_field_ordering += 1
     output_writer = open(output_csv_path, "w")
-    csv_map(source_csv, input_field_ordering, row_remap_func, output_writer)
+    csv_map(source_csv_path, input_field_ordering, row_remap_func, output_writer)
 
 
 
