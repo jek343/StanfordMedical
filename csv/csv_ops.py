@@ -54,7 +54,7 @@ def csv_map(source_csv_path, field_order, row_remap_func, output_writer):
 
 
 def save_columns(source_csv_path, column_names, field_row, output_csv_path):
-    source_csv_file = open(PATH)
+    source_csv_file = open(source_csv_path)
     source_csv = csv.reader(source_csv_file, delimiter=',')
     def row_remap_func(row_num, row_dict):
         if row_num == field_row:
