@@ -1,4 +1,5 @@
 import csv
+import numpy as np
 
 def __row_to_dict(row, field_order):
     return {field_order[i]: row[i] for i in range(len(field_order))}
@@ -39,24 +40,34 @@ def csv_map(source_csv_path, field_order, row_remap_func, output_writer):
 
 
     row_num = 0
+    ratios = []
+    max_ratio = 0.012261917382239656
     for row in load_csv(source_csv_path):
         row_dict = __row_to_dict(row, field_order)
         remapped_row_dict = row_remap_func(row_num, row_dict)
+        #max_ratio = max(new_ratio, max_ratio)
+        #ratios = ratios.append(new_ratio)
         if remapped_row_dict is not None:
-            row_str = ""
-            for field in remap_fields:
+            new_ratio = remapped_row_dict["Died"]
+            row_str_woutm = ""
+            for field in remap_fields[:-1]:
                 value = remapped_row_dict[field]
-                row_str += value +  ","
-            row_str = row_str[:len(row_str) - 1] + "\n"
-            output_writer.write(row_str)
+                row_str_woutm += value +  ","
+
+            for i in range(100):
+                die = "1" if (np.random.rand() <= (float(new_ratio) / max_ratio)) else "0"
+                row_str = row_str_woutm + die
+                row_str = row_str + "\n"
+                output_writer.write(row_str)
         row_num += 1
-
-
 
 def save_columns(source_csv_path, column_names, field_row, output_csv_path):
     source_csv_file = open(source_csv_path)
     source_csv = csv.reader(source_csv_file, delimiter=',')
+    input_field_ordering = 0
     def row_remap_func(row_num, row_dict):
+        ratios = []
+        max_ratio = 0.012261917382239656
         if row_num == field_row or row_num == field_row+1:
             return None
         if row_dict["Premature age-adjusted mortality denominator"]=="" or row_dict["Premature age-adjusted mortality numerator"]=="":
@@ -65,16 +76,16 @@ def save_columns(source_csv_path, column_names, field_row, output_csv_path):
         for col in column_names:
             if col in row_dict:
                 out[col] = row_dict[col]
-        out["Mortality Ratio"] = str(float(row_dict["Premature age-adjusted mortality numerator"]) / float(row_dict["Premature age-adjusted mortality denominator"]))
+        out["Mortality Ratio"] = str((float(row_dict["Premature age-adjusted mortality numerator"]) / float(row_dict["Premature age-adjusted mortality denominator"])/max_ratio))
+        out["Died"] = str(float(row_dict["Premature age-adjusted mortality numerator"]) / float(row_dict["Premature age-adjusted mortality denominator"]))
         return out
-
-    input_field_ordering = 0
     for row in source_csv:
         if input_field_ordering == field_row:
             input_field_ordering = row
             break
         input_field_ordering += 1
     output_writer = open(output_csv_path, "w")
+
     csv_map(source_csv_path, input_field_ordering, row_remap_func, output_writer)
 
 
