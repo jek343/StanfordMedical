@@ -8,8 +8,10 @@ import csvs.csv_ops as csv_ops
 import pandas as pd
 
 blank = np.array([]).astype(int)
-data_path = os.path.join(os.getcwd(), '..',  'datasets', 'analytic_data2019.csv')
-output_data_path = os.path.join(os.getcwd(),  '..', 'datasets', 'cheesed_analytic_data2019.csv')
+# data_path = os.path.join(os.getcwd(), '..',  'datasets', 'analytic_data2019.csv')
+# output_data_path = os.path.join(os.getcwd(),  '..', 'datasets', 'cheesed_analytic_data2019.csv')
+data_path = os.path.join(os.getcwd(),  '..', 'datasets', 'analytic_data2018.csv')
+output_data_path = os.path.join(os.getcwd(),  '..', 'datasets', 'cheesed_analytic_data2018.csv')
 #clean_data_path = os.path.join(os.getcwd(),  '..', 'datasets', 'clean_analytic_data2019.csv')
 if not os.path.exists(output_data_path):
     with open(data_path) as dataset:
@@ -42,12 +44,19 @@ for c in non_numeric:
 X = dataset[X_cols]
 y = dataset[Y_cols]
 
+X -= np.min(X, axis = 1)[:,np.newaxis]
+X /= np.max(X, axis = 1)[:,np.newaxis]
+
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
 y_train = y_train.iloc[:, 1]
 y_test = y_test.iloc[:, 0]
-clf = LogisticRegression(penalty = "l1").fit(X_train, y_train)
+# clf = LogisticRegression(penalty = 'l2', C = 1000.0).fit(X_train, y_train)
+clf = LogisticRegression(penalty = 'l2').fit(X_train, y_train)
+# print(clf.coef_)
 
 pred_y = clf.predict_proba(X_test)[:,1]
 print(mean_absolute_error(y_test, pred_y))
 #clf.score(X_test, y_test)
+for i in range(20):
+    print(str(np.array(pred_y)[i]) + ' : ' + str(np.array(y_test)[i]))
