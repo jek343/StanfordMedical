@@ -17,22 +17,23 @@ def __get_all_remapped_fields(source_csv, field_order, row_remap_func):
     return csv_fold(source_csv, __fold_func, (0, []))[1]
 
 
-
 def csv_fold(source_csv, f, x0):
     out = x0
     for row in source_csv:
         out = f(row, out)
     return out
 
+
 def load_csv(source_csv_path):
-    source_csv_file = open(PATH)
+    source_csv_file = open(source_csv_path)
     return csv.reader(source_csv_file, delimiter=',')
+
 
 #row remap func returns None if the row shouldn't be included.
 #row_remap_func of form row_remap_func(row_num, row_dict)
 def csv_map(source_csv_path, field_order, row_remap_func, output_writer):
     remap_fields = __get_all_remapped_fields(load_csv(source_csv_path), field_order, row_remap_func)
-    print("remap_fields: ", remap_fields)
+    
     field_str = ",".join(remap_fields)
     field_str = field_str[:len(field_str) - 1] + "\n"
     output_writer.write(field_str)
@@ -72,7 +73,7 @@ def save_columns(source_csv_path, column_names, field_row, output_csv_path):
             break
         input_field_ordering += 1
     output_writer = open(output_csv_path, "w")
-    csv_map(source_csv, input_field_ordering, row_remap_func, output_writer)
+    csv_map(source_csv_path, input_field_ordering, row_remap_func, output_writer)
 
 
 
