@@ -102,6 +102,17 @@ def find_max_ratio (source_csv_path):
     return max_ratio
 
 
+def clean_dataset (data_path):
+    if not os.path.exists(data_path):
+        with open(data_path) as dataset:
+            data_reader = csv.reader(dataset, delimiter=',')
+            first_row = next(data_reader)
+            for row in data_reader:
+                 row = np.array(row)
+                 blank = np.union1d(blank, np.where(row == "")[0])
+             not_blank = np.setdiff1d(np.arange(len(first_row)), blank)
+             e_cols = np.take(first_row, not_blank)
+    save_columns(str(data_path), e_cols, 0, str(data_path))
 
 if __name__ == "__main__":
 
