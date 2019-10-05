@@ -2,7 +2,7 @@ import csv
 import os
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_erro
 import numpy as np
 import csvs.csv_ops as csv_ops
 import pandas as pd
@@ -52,7 +52,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
 y_train = y_train.iloc[:, 1]
 y_test = y_test.iloc[:, 0]
 # clf = LogisticRegression(penalty = 'l2', C = 1000.0).fit(X_train, y_train)
-clf = LogisticRegression(penalty = 'l2').fit(X_train, y_train)
+clf = LogisticRegression(penalty='l2').fit(X_train, y_train)
 # print(clf.coef_)
 
 pred_y = clf.predict_proba(X_test)[:,1]
