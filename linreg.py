@@ -55,7 +55,7 @@ def get_remove_fields(data_dict, field_names):
     for field_name in field_names:
         if field_name not in remove_features and \
             ("numerator" in field_name
-                or "denominator" in field_name
+                or "denominato" in field_name
                 or "FIPS" in field_name
                 or "Year" in field_name
                 or "CI" in field_name):
@@ -123,6 +123,7 @@ y /= y.max()
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 y_train = y_train.iloc[:, 0]
 y_test = y_test.iloc[:, 0]
+# clf = LogisticRegression(penalty = 'l2', C = 1000.0).fit(X_train, y_train)
 # clf = Lasso(alpha=.000000001, fit_intercept=True)  # l1
 # clf = Ridge(alpha=1.0, fit_intercept=True)  # l2
 clf = LinearRegression()
