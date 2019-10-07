@@ -76,7 +76,19 @@ def save_columns(source_csv_path, column_names, field_row, output_csv_path):
     csv_map(source_csv_path, input_field_ordering, row_remap_func, output_writer)
 
 
-
+def get_data_as_dicts(csv, ignore_rows, field_names):
+    row_num = 0
+    D = []
+    for row in csv:
+        if row_num not in ignore_rows:
+            i = 0
+            d = {}
+            for x in row:
+                d[field_names[i]] = x
+                i += 1
+            D.append(d)
+        row_num += 1
+    return D
 
 
 
