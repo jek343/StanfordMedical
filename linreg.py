@@ -1,10 +1,9 @@
 import csv
 import os
-from sklearn.linear_model import LinearRegression
-from sklearn.linear_model import Ridge
-from sklearn.linear_model import Lasso
+from sklearn import preprocessing
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, r2_score
 import numpy as np
 import pandas as pd
 
@@ -108,7 +107,9 @@ REMOVE_FIELDS = get_remove_fields(DATA_DICT, FIELD_NAMES)
 DATA_DICT = trim_features(DATA_DICT, REMOVE_FIELDS)
 X, y, X_field_order = data_dict_to_dataset(DATA_DICT, "Premature age-adjusted mortality raw value")
 
-X = pd.DataFrame(data=X, columns=X_field_order)
+# print(preprocessing.scale(X).std(axis=0))
+# print(X.std(axis=0))
+X = pd.DataFrame(data=preprocessing.scale(X), columns=X_field_order)
 y = pd.DataFrame(data=y, columns=["Mortality Ratio"])
 # print(X)
 
@@ -124,16 +125,19 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 y_train = y_train.iloc[:, 0]
 y_test = y_test.iloc[:, 0]
 # clf = LogisticRegression(penalty = 'l2', C = 1000.0).fit(X_train, y_train)
-# clf = Lasso(alpha=.000000001, fit_intercept=True)  # l1
+# clf = Lasso(alpha=1.0, fit_intercept=True)  # l1
 # clf = Ridge(alpha=1.0, fit_intercept=True)  # l2
 clf = LinearRegression()
 clf = clf.fit(X_train, y_train)
 
-for i in range(len(X_field_order)):
-    print((X_field_order[i], clf.coef_[i]))
+# for i in range(len(X_field_order)):
+#     if abs(clf.coef_[i]) == 0:
+#         # print((X_field_order[i], clf.coef_[i]))
+#         print(X_field_order[i])
 
 pred_y = clf.predict(X_test)  # [:,0]
 print('mean absolute error', mean_absolute_error(y_test, pred_y))
+print('r2', r2_score(y_test, pred_y))
 #  clf.score(X_test, y_test)
 # print(('prediction', 'mortality ratio'))
 # for i in range(20):
