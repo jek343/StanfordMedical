@@ -1,8 +1,4 @@
-import sklearn.datasets as datasets
-import ml.penalty.regularized_KL_divergence as regularized_KL_divergence
-import ml.function.differentiable.logistic_regression_function as logistic_regression_function
 
-import ml.function.norm.l1_norm as l1_norm
 import numpy as np
 '''
 X,y = datasets.load_breast_cancer(return_X_y = True)
@@ -17,6 +13,7 @@ X = X.astype(np.float32)
 y = y.astype(np.float32)
 y *= 0.9
 y += .05
+'''
 '''
 model = logistic_regression_function
 X = np.random.rand(1000,3)
@@ -45,3 +42,9 @@ for iter in range(0, 10000):
         print("cost: ", cost)
         theta -= learn_rate * grad_theta
         print("theta - theta_gt: ", np.linalg.norm(theta - theta_gt))
+'''
+if __name__ == "__main__":
+    from ml.model.regression.gradient_boosting.decision_tree_boosted_regressor import DecisionTreeBoostedRegressor
+    from sklearn.utils.estimator_checks import check_estimator
+
+    print("is estimator? ", check_estimator(DecisionTreeBoostedRegressor))
