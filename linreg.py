@@ -124,23 +124,18 @@ y /= y.max()
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 y_train = y_train.iloc[:, 0]
 y_test = y_test.iloc[:, 0]
-# clf = LogisticRegression(penalty = 'l2', C = 1000.0).fit(X_train, y_train)
 # clf = Lasso(alpha=1.0, fit_intercept=True)  # l1
 # clf = Ridge(alpha=1.0, fit_intercept=True)  # l2
 clf = LinearRegression()
 clf = clf.fit(X_train, y_train)
 
-# for i in range(len(X_field_order)):
-#     if abs(clf.coef_[i]) == 0:
-#         # print((X_field_order[i], clf.coef_[i]))
-#         print(X_field_order[i])
-
 pred_y = clf.predict(X_test)  # [:,0]
-print('mean absolute error', mean_absolute_error(y_test, pred_y))
-print('r2', r2_score(y_test, pred_y))
+
+
 #  clf.score(X_test, y_test)
 # print(('prediction', 'mortality ratio'))
 # for i in range(20):
 #     print((np.array(pred_y)[i], np.array(y_test)[i]))
-
+print('mean absolute error', mean_absolute_error(y_test, pred_y))
+print('r2', r2_score(y_test, pred_y))
 print("bias", clf.intercept_)
