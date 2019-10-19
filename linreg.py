@@ -120,6 +120,11 @@ y -= y.min()
 y /= y.max()
 # y *= 10
 
+#calculate correlation between X and y and print in decreasing magnitude
+Xy = pd.concat([X, y], axis=1)
+correlation = Xy.corr()[y.columns[0]][:]
+order = correlation.map(lambda x : abs(x)).sort_values(ascending = False)
+print(correlation[order.index.values[1:]])
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 y_train = y_train.iloc[:, 0]
