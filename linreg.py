@@ -125,7 +125,8 @@ y /= y.max()
 Xy = pd.concat([X, y], axis=1)
 correlation = Xy.corr()[y.columns[0]][:]
 order = correlation.map(lambda x : abs(x)).sort_values(ascending = False)
-print(correlation[order.index.values[1:]])
+for i in order.index.values[1:]:
+    print(X_field_order.index(i), i, correlation[i])
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 y_train = y_train.iloc[:, 0]
@@ -200,4 +201,11 @@ plt.xlabel("Index of feature")
 plt.ylabel("Weight Value")
 plt.title("L2 Linear Regression Weight Value vs Index of feature")
 plt.savefig('weights2.pdf')
+plt.clf()
+
+plt.bar(range(len(clf1.coef_)), correlation[:-1])
+plt.xlabel("Index of feature")
+plt.ylabel("Correlation between feature and mortality")
+plt.title("Correlation between feature and mortality vs Index of feature")
+plt.savefig("corr.pdf")
 plt.clf()
