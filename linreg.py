@@ -166,13 +166,13 @@ ax.scatter(range(len(clf.coef_)),clf.coef_, s = 5)
 for i, txt in enumerate(clf.coef_):
     if abs(txt) > 0.1:
         ax.annotate(i, (i+0.5,txt), fontsize=7)
-        print(i, X_field_order[i])
+        print(i, X_field_order[i], txt)
 
 plt.xlabel("Index of feature")
 plt.ylabel("Weight Value")
 plt.title("Unregularized Linear Regression Weight Value vs Index of feature")
 plt.legend(["R^2: " + str(round(r2_score(y_test, pred_y),2))], loc="lower right")
-plt.savefig('weights.pdf')
+plt.savefig('weights.png')
 plt.clf()
 
 fig, ax = plt.subplots()
@@ -180,13 +180,13 @@ ax.scatter(range(len(clf1.coef_)),clf1.coef_, s = 5, color="orange")
 for i, txt in enumerate(clf1.coef_):
     if abs(txt) > 0.1:
         ax.annotate(i, (i+0.5,txt), fontsize=7)
-        print(i, X_field_order[i])
+        print(i, X_field_order[i], txt)
 
 plt.xlabel("Index of feature")
 plt.ylabel("Weight Value")
 plt.title("L1 Linear Regression Weight Value vs Index of feature")
 plt.legend(["R^2: " + str(round(r2_score(y_test, pred_y1),2))], loc="lower right")
-plt.savefig('weights1.pdf')
+plt.savefig('weights1.png')
 plt.clf()
 
 fig, ax = plt.subplots()
@@ -194,18 +194,18 @@ ax.scatter(range(len(clf2.coef_)),clf2.coef_, s = 5, color="green")
 for i, txt in enumerate(clf2.coef_):
     if abs(txt) > 0.1:
         ax.annotate(i, (i+0.5,txt), fontsize=7)
-        print(i, X_field_order[i])
+        print(i, X_field_order[i], txt)
 
 plt.legend(["R^2: " + str(round(r2_score(y_test, pred_y2),2))], loc="lower right")
 plt.xlabel("Index of feature")
 plt.ylabel("Weight Value")
 plt.title("L2 Linear Regression Weight Value vs Index of feature")
-plt.savefig('weights2.pdf')
+plt.savefig('weights2.png')
 plt.clf()
 
 plt.bar(range(len(clf1.coef_)), correlation[:-1])
 plt.xlabel("Index of feature")
 plt.ylabel("Correlation between feature and mortality")
 plt.title("Correlation between feature and mortality vs Index of feature")
-plt.savefig("corr.pdf")
+plt.savefig("corr.png")
 plt.clf()
