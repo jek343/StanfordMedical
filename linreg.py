@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def open_csv(path):
@@ -129,12 +130,18 @@ print(correlation[order.index.values[1:]])
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 y_train = y_train.iloc[:, 0]
 y_test = y_test.iloc[:, 0]
-# clf = Lasso(alpha=1.0, fit_intercept=True)  # l1
-# clf = Ridge(alpha=1.0, fit_intercept=True)  # l2
+
 clf = LinearRegression()
+clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
+clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
+
 clf = clf.fit(X_train, y_train)
+clf1 = clf1.fit(X_train, y_train)
+clf2 = clf2.fit(X_train, y_train)
 
 pred_y = clf.predict(X_test)  # [:,0]
+pred_y1 = clf1.predict(X_test)
+pred_y2 = clf2.predict(X_test)
 
 
 #  clf.score(X_test, y_test)
@@ -144,3 +151,53 @@ pred_y = clf.predict(X_test)  # [:,0]
 print('mean absolute error', mean_absolute_error(y_test, pred_y))
 print('r2', r2_score(y_test, pred_y))
 print("bias", clf.intercept_)
+
+print('mean absolute error 1', mean_absolute_error(y_test, pred_y1))
+print('r2 1', r2_score(y_test, pred_y1))
+print("bias 1", clf1.intercept_)
+
+print('mean absolute error 2', mean_absolute_error(y_test, pred_y2))
+print('r2 2', r2_score(y_test, pred_y2))
+print("bias 2", clf2.intercept_)
+
+fig, ax = plt.subplots()
+ax.scatter(range(len(clf.coef_)),clf.coef_, s = 5)
+for i, txt in enumerate(clf.coef_):
+    if abs(txt) > 0.1:
+        ax.annotate(i, (i+0.5,txt), fontsize=7)
+        print(i, X_field_order[i])
+
+plt.xlabel("Index of feature")
+plt.ylabel("Weight Value")
+plt.title("Unregularized Linear Regression Weight Value vs Index of feature")
+plt.legend(["R^2: " + str(round(r2_score(y_test, pred_y),2))], loc="lower right")
+plt.savefig('weights.pdf')
+plt.clf()
+
+fig, ax = plt.subplots()
+ax.scatter(range(len(clf1.coef_)),clf1.coef_, s = 5, color="orange")
+for i, txt in enumerate(clf1.coef_):
+    if abs(txt) > 0.1:
+        ax.annotate(i, (i+0.5,txt), fontsize=7)
+        print(i, X_field_order[i])
+
+plt.xlabel("Index of feature")
+plt.ylabel("Weight Value")
+plt.title("L1 Linear Regression Weight Value vs Index of feature")
+plt.legend(["R^2: " + str(round(r2_score(y_test, pred_y1),2))], loc="lower right")
+plt.savefig('weights1.pdf')
+plt.clf()
+
+fig, ax = plt.subplots()
+ax.scatter(range(len(clf2.coef_)),clf2.coef_, s = 5, color="green")
+for i, txt in enumerate(clf2.coef_):
+    if abs(txt) > 0.1:
+        ax.annotate(i, (i+0.5,txt), fontsize=7)
+        print(i, X_field_order[i])
+
+plt.legend(["R^2: " + str(round(r2_score(y_test, pred_y2),2))], loc="lower right")
+plt.xlabel("Index of feature")
+plt.ylabel("Weight Value")
+plt.title("L2 Linear Regression Weight Value vs Index of feature")
+plt.savefig('weights2.pdf')
+plt.clf()
