@@ -9,6 +9,31 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+include_features_paper = ["% Rural raw value", "Population raw value",
+                    "% Females raw value", "% below 18 years of age raw value",
+                    "% 65 and older raw value",
+                    "% Non-Hispanic African American raw value",
+                    "% Hispanic raw value", "% Asian raw value",
+                    "% American Indian and Alaskan Native raw value",
+                    "% Native Hawaiian/Other Pacific Islander raw value",
+                    "Median household income raw value",
+                    "Some college raw value",
+                    "Food insecurity raw value",
+                    "Unemployment raw value",
+                    "Severe housing problems raw value",
+                    "Uninsured raw value",
+                    "Primary care physicians raw value",
+                    "Access to exercise opportunities raw value",
+                    "Food environment index raw value",
+                    "Premature age-adjusted mortality raw value"]
+
+include_features_brfs = ["Premature age-adjusted mortality raw value",
+"Poor physical health days raw value", "Poor mental health days raw value",
+"Adult smoking raw value","Adult obesity raw value", "Physical inactivity raw value",
+"Access to exercise opportunities raw value", "Excessive drinking raw value",
+"Sexually transmitted infections raw value", "Teen births raw value", "Diabetes prevalence raw value",
+"Insufficient sleep raw value", "Social associations raw value"]
+
 def open_csv(path):
     data_csv_file = open(path)
     return csv.reader(data_csv_file, delimiter=',')
@@ -58,7 +83,15 @@ def get_remove_fields(data_dict, field_names):
                 or "denominato" in field_name
                 or "FIPS" in field_name
                 or "Year" in field_name
-                or "CI" in field_name):
+                or "CI" in field_name
+                or field_name.lower() == "premature death raw value"
+                or field_name.lower() == "life expectancy raw value"
+                or field_name.lower() == "injury deaths raw value"
+                # or field_name == "Premature age-adjusted mortality raw value"
+                or field_name == "County Ranked (Yes=1/No=0)"):
+        # if field_name not in remove_features and field_name not in include_features_paper:
+        #     # if "Rural" in field_name or "rural" in field_name:
+        #     #     print(field_name)
             remove_features.append(field_name)
 
     return remove_features
@@ -67,6 +100,7 @@ def get_remove_fields(data_dict, field_names):
 def trim_features(data_dict, remove_features):
     for remove_feature in remove_features:
         for i in range(len(data_dict)):
+            # print(data_dict[i])
             del data_dict[i][remove_feature]
 
     return data_dict
@@ -77,6 +111,8 @@ def data_dict_to_dataset(data_dict, label_field_name):
     for d_feature in data_dict[0]:
         if d_feature != label_field_name:
             X_field_order.append(d_feature)
+
+    print(X_field_order)
 
     X = np.zeros((len(data_dict), len(data_dict[0]) - 1), dtype=np.float64)
 
@@ -106,7 +142,7 @@ REMOVE_ROWS = get_remove_rows(open_csv(DATA_PATH), FIELD_NAMES)
 DATA_DICT = get_data_as_dicts(open_csv(DATA_PATH), REMOVE_ROWS, FIELD_NAMES)
 REMOVE_FIELDS = get_remove_fields(DATA_DICT, FIELD_NAMES)
 DATA_DICT = trim_features(DATA_DICT, REMOVE_FIELDS)
-X, y, X_field_order = data_dict_to_dataset(DATA_DICT, "Premature age-adjusted mortality raw value")
+X, y, X_field_order = data_dict_to_dataset(DATA_DICT, "Alcohol-impaired driving deaths raw value")
 
 # print(preprocessing.scale(X).std(axis=0))
 # print(X.std(axis=0))
@@ -125,8 +161,8 @@ y /= y.max()
 Xy = pd.concat([X, y], axis=1)
 correlation = Xy.corr()[y.columns[0]][:]
 order = correlation.map(lambda x : abs(x)).sort_values(ascending = False)
-for i in order.index.values[1:]:
-    print(X_field_order.index(i), i, correlation[i])
+# for i in order.index.values[1:]:
+#     print(X_field_order.index(i), i, correlation[i])
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 y_train = y_train.iloc[:, 0]
@@ -162,11 +198,17 @@ print('r2 2', r2_score(y_test, pred_y2))
 print("bias 2", clf2.intercept_)
 
 fig, ax = plt.subplots()
-ax.scatter(range(len(clf.coef_)),clf.coef_, s = 5)
+ax.scatter(range(len(clf.coef_)), clf.coef_, s = 5)
+# print if weight >.1
 for i, txt in enumerate(clf.coef_):
     if abs(txt) > 0.1:
         ax.annotate(i, (i+0.5,txt), fontsize=7)
         print(i, X_field_order[i], txt)
+# print all weights
+# for i, txt in enumerate(clf.coef_):
+#     # ax.annotate(i, (i+0.5,txt), fontsize=7)
+#     print(i, X_field_order[i], txt)
+
 
 plt.xlabel("Index of feature")
 plt.ylabel("Weight Value")
