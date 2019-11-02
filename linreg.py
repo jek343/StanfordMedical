@@ -4,9 +4,11 @@ from sklearn import preprocessing
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.preprocessing import StandardScaler
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 include_features_paper = ["% Rural raw value", "Population raw value",
@@ -28,11 +30,17 @@ include_features_paper = ["% Rural raw value", "Population raw value",
                     "Premature age-adjusted mortality raw value"]
 
 include_features_brfs = ["Premature age-adjusted mortality raw value",
-"Poor physical health days raw value", "Poor mental health days raw value",
-"Adult smoking raw value","Adult obesity raw value", "Physical inactivity raw value",
-"Access to exercise opportunities raw value", "Excessive drinking raw value",
-"Sexually transmitted infections raw value", "Teen births raw value", "Diabetes prevalence raw value",
-"Insufficient sleep raw value", "Social associations raw value"]
+                    "Poor physical health days raw value",
+                    "Poor mental health days raw value",
+                    "Adult smoking raw value","Adult obesity raw value",
+                    "Physical inactivity raw value",
+                    "Access to exercise opportunities raw value",
+                    "Excessive drinking raw value",
+                    "Sexually transmitted infections raw value",
+                    "Teen births raw value", "Diabetes prevalence raw value",
+                    "Insufficient sleep raw value", "Social associations raw value"]
+
+
 
 def open_csv(path):
     data_csv_file = open(path)
@@ -67,7 +75,10 @@ def get_data_as_dicts(csv, ignore_rows, field_names):
 
 
 def is_numeric_string(s):
-    return s.replace('.', '', 1).isdigit()
+    s.replace('.', '', 1).isdigit()
+    s.replace('E', '', 1).isdigit()
+    s.replace('-', '', 1).isdigit()
+    return s
 
 
 def get_remove_fields(data_dict, field_names):
@@ -88,21 +99,17 @@ def get_remove_fields(data_dict, field_names):
                 or field_name.lower() == "life expectancy raw value"
                 or field_name.lower() == "injury deaths raw value"
                 # or field_name == "Premature age-adjusted mortality raw value"
-                or field_name == "County Ranked (Yes=1/No=0)"):
-        # if field_name not in remove_features and field_name not in include_features_paper:
-        #     # if "Rural" in field_name or "rural" in field_name:
-        #     #     print(field_name)
+                or field_name == "County Ranked (Yes=1/No=0)"
+                or field_name == "State Abbreviation"
+                or field_name == "Name"):
             remove_features.append(field_name)
-
     return remove_features
 
 
 def trim_features(data_dict, remove_features):
     for remove_feature in remove_features:
         for i in range(len(data_dict)):
-            # print(data_dict[i])
             del data_dict[i][remove_feature]
-
     return data_dict
 
 
@@ -111,8 +118,6 @@ def data_dict_to_dataset(data_dict, label_field_name):
     for d_feature in data_dict[0]:
         if d_feature != label_field_name:
             X_field_order.append(d_feature)
-
-    print(X_field_order)
 
     X = np.zeros((len(data_dict), len(data_dict[0]) - 1), dtype=np.float64)
 
@@ -144,38 +149,71 @@ REMOVE_FIELDS = get_remove_fields(DATA_DICT, FIELD_NAMES)
 DATA_DICT = trim_features(DATA_DICT, REMOVE_FIELDS)
 X, y, X_field_order = data_dict_to_dataset(DATA_DICT, "Alcohol-impaired driving deaths raw value")
 
-# print(preprocessing.scale(X).std(axis=0))
-# print(X.std(axis=0))
 X = pd.DataFrame(data=preprocessing.scale(X), columns=X_field_order)
 y = pd.DataFrame(data=y, columns=["Mortality Ratio"])
-# print(X)
+Xy = pd.concat([X, y], axis=1)
 
 X -= np.min(X, axis=1)[:, np.newaxis]
 X /= np.max(X, axis=1)[:, np.newaxis]
 
 y -= y.min()
 y /= y.max()
-# y *= 10
 
 #calculate correlation between X and y and print in decreasing magnitude
-Xy = pd.concat([X, y], axis=1)
-correlation = Xy.corr()[y.columns[0]][:]
-order = correlation.map(lambda x : abs(x)).sort_values(ascending = False)
-# for i in order.index.values[1:]:
-#     print(X_field_order.index(i), i, correlation[i])
+def corr_coef_Xy_dec_mag(Xy):
+    correlation = Xy.corr()[y.columns[0]][:]
+    order = correlation.map(lambda x : abs(x)).sort_values(ascending = False)
+    #printing the correlation coefficient matrix
+    for i in order.index.values[1:]:
+        print(X_field_order.index(i), i, correlation[i])
+    #create bar graph of coefficients
+    plt.bar(range(len(clf1.coef_)), correlation[:-1])
+    plt.xlabel("Index of feature")
+    plt.ylabel("Correlation between feature and mortality")
+    plt.title("Correlation between feature and mortality vs Index of feature")
+    plt.savefig("corr.png")
+    plt.clf()
 
+def create_coef_map(cols, shrink, filename, label_font_size, coef_font_size):
+    stdsc = StandardScaler()
+    X_std = stdsc.fit_transform(Xy[cols].iloc[:,range(len(cols))].values)
+    cov_mat =np.cov(X_std.T)
+    plt.figure(figsize=(10,10))
+    sns.set(font_scale=label_font_size)
+    hm = sns.heatmap(cov_mat,
+                     cbar=True,
+                     cbar_kws={"shrink": shrink},
+                     annot=True,
+                     square=True,
+                     fmt='.2f',
+                     annot_kws={'size': coef_font_size},
+                     cmap='coolwarm',
+                     yticklabels=[x[:-10] for x in cols],
+                     xticklabels=[x[:-10] for x in cols])
+    plt.title('Covariance matrix showing correlation coefficients', size = 18)
+    plt.tight_layout()
+    plt.savefig(filename + ".png")
+    plt.cla()
+
+create_coef_map(include_features_brfs, 0.71, "coef_brfs", 1.5, 12)
+create_coef_map(include_features_paper, 0.82, "coef_paper", 0.95, 8)
+
+#splitting the data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 y_train = y_train.iloc[:, 0]
 y_test = y_test.iloc[:, 0]
 
+#creating the models
 clf = LinearRegression()
 clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
 clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
 
+#fitting the models
 clf = clf.fit(X_train, y_train)
 clf1 = clf1.fit(X_train, y_train)
 clf2 = clf2.fit(X_train, y_train)
 
+#predicting the outputs
 pred_y = clf.predict(X_test)  # [:,0]
 pred_y1 = clf1.predict(X_test)
 pred_y2 = clf2.predict(X_test)
@@ -185,6 +223,8 @@ pred_y2 = clf2.predict(X_test)
 # print(('prediction', 'mortality ratio'))
 # for i in range(20):
 #     print((np.array(pred_y)[i], np.array(y_test)[i]))
+
+#analyzing performance of models
 print('mean absolute error', mean_absolute_error(y_test, pred_y))
 print('r2', r2_score(y_test, pred_y))
 print("bias", clf.intercept_)
@@ -204,10 +244,6 @@ for i, txt in enumerate(clf.coef_):
     if abs(txt) > 0.1:
         ax.annotate(i, (i+0.5,txt), fontsize=7)
         print(i, X_field_order[i], txt)
-# print all weights
-# for i, txt in enumerate(clf.coef_):
-#     # ax.annotate(i, (i+0.5,txt), fontsize=7)
-#     print(i, X_field_order[i], txt)
 
 
 plt.xlabel("Index of feature")
@@ -243,11 +279,4 @@ plt.xlabel("Index of feature")
 plt.ylabel("Weight Value")
 plt.title("L2 Linear Regression Weight Value vs Index of feature")
 plt.savefig('weights2.png')
-plt.clf()
-
-plt.bar(range(len(clf1.coef_)), correlation[:-1])
-plt.xlabel("Index of feature")
-plt.ylabel("Correlation between feature and mortality")
-plt.title("Correlation between feature and mortality vs Index of feature")
-plt.savefig("corr.png")
 plt.clf()
