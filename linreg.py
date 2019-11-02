@@ -10,8 +10,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+predict = "Alcohol-impaired driving deaths raw value"
 
-include_features_paper = ["% Rural raw value", "Population raw value",
+include_features_paper = [predict, "% Rural raw value", "Population raw value",
                     "% Females raw value", "% below 18 years of age raw value",
                     "% 65 and older raw value",
                     "% Non-Hispanic African American raw value",
@@ -26,10 +27,9 @@ include_features_paper = ["% Rural raw value", "Population raw value",
                     "Uninsured raw value",
                     "Primary care physicians raw value",
                     "Access to exercise opportunities raw value",
-                    "Food environment index raw value",
-                    "Premature age-adjusted mortality raw value"]
+                    "Food environment index raw value"]
 
-include_features_brfs = ["Premature age-adjusted mortality raw value",
+include_features_brfs = [predict,
                     "Poor physical health days raw value",
                     "Poor mental health days raw value",
                     "Adult smoking raw value","Adult obesity raw value",
@@ -40,7 +40,9 @@ include_features_brfs = ["Premature age-adjusted mortality raw value",
                     "Teen births raw value", "Diabetes prevalence raw value",
                     "Insufficient sleep raw value", "Social associations raw value"]
 
-
+#if fields is [], will use all the usable & not obviously correlated features
+fields = []
+coef = "all"
 
 def open_csv(path):
     data_csv_file = open(path)
@@ -67,7 +69,8 @@ def get_data_as_dicts(csv, ignore_rows, field_names):
             i = 0
             d = {}
             for x in row:
-                d[field_names[i]] = x
+                field = field_names[i]
+                d[field] = x
                 i += 1
             D.append(d)
         row_num += 1
@@ -81,7 +84,7 @@ def is_numeric_string(s):
     return s
 
 
-def get_remove_fields(data_dict, field_names):
+def get_remove_fields(data_dict, field_names, field_subset):
     remove_features = []
     for d in data_dict:
         for feature in d:
@@ -95,13 +98,10 @@ def get_remove_fields(data_dict, field_names):
                 or "FIPS" in field_name
                 or "Year" in field_name
                 or "CI" in field_name
-                or field_name.lower() == "premature death raw value"
-                or field_name.lower() == "life expectancy raw value"
-                or field_name.lower() == "injury deaths raw value"
-                # or field_name == "Premature age-adjusted mortality raw value"
                 or field_name == "County Ranked (Yes=1/No=0)"
                 or field_name == "State Abbreviation"
-                or field_name == "Name"):
+                or field_name == "Name"
+                or field_name not in field_subset):
             remove_features.append(field_name)
     return remove_features
 
@@ -143,14 +143,29 @@ def get_remove_rows(csv, field_names):
 
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data2019.csv')
 FIELD_NAMES = read_fields(open_csv(DATA_PATH), 0)
+
+possible_y = ["Premature death raw value", "Life expectancy raw value",
+"Injury deaths raw value", "Premature age-adjusted mortality raw value",
+"Alcohol-impaired driving deaths raw value"]
+
+if len(fields) == 0:
+    fields = [FIELD_NAMES[i] for i in range(len(FIELD_NAMES))]
+    for y in possible_y:
+        if y != predict:
+            fields.remove(y)
+
+
 REMOVE_ROWS = get_remove_rows(open_csv(DATA_PATH), FIELD_NAMES)
 DATA_DICT = get_data_as_dicts(open_csv(DATA_PATH), REMOVE_ROWS, FIELD_NAMES)
-REMOVE_FIELDS = get_remove_fields(DATA_DICT, FIELD_NAMES)
+
+REMOVE_FIELDS = get_remove_fields(DATA_DICT, FIELD_NAMES, fields)
+
 DATA_DICT = trim_features(DATA_DICT, REMOVE_FIELDS)
-X, y, X_field_order = data_dict_to_dataset(DATA_DICT, "Alcohol-impaired driving deaths raw value")
+
+X, y, X_field_order = data_dict_to_dataset(DATA_DICT, predict)
 
 X = pd.DataFrame(data=preprocessing.scale(X), columns=X_field_order)
-y = pd.DataFrame(data=y, columns=["Mortality Ratio"])
+y = pd.DataFrame(data=y, columns=[predict])
 Xy = pd.concat([X, y], axis=1)
 
 X -= np.min(X, axis=1)[:, np.newaxis]
@@ -174,11 +189,12 @@ def corr_coef_Xy_dec_mag(Xy):
     plt.savefig("corr.png")
     plt.clf()
 
-def create_coef_map(cols, shrink, filename, label_font_size, coef_font_size):
+def create_coef_map(shrink, filename, label_font_size, coef_font_size, fig_size, title_size):
+    cols = list(Xy.columns)
     stdsc = StandardScaler()
     X_std = stdsc.fit_transform(Xy[cols].iloc[:,range(len(cols))].values)
     cov_mat =np.cov(X_std.T)
-    plt.figure(figsize=(10,10))
+    plt.figure(figsize=(fig_size,fig_size))
     sns.set(font_scale=label_font_size)
     hm = sns.heatmap(cov_mat,
                      cbar=True,
@@ -190,13 +206,22 @@ def create_coef_map(cols, shrink, filename, label_font_size, coef_font_size):
                      cmap='coolwarm',
                      yticklabels=[x[:-10] for x in cols],
                      xticklabels=[x[:-10] for x in cols])
-    plt.title('Covariance matrix showing correlation coefficients', size = 18)
+    plt.title('Covariance matrix showing correlation coefficients', size = title_size)
     plt.tight_layout()
     plt.savefig(filename + ".png")
     plt.cla()
 
-create_coef_map(include_features_brfs, 0.71, "coef_brfs", 1.5, 12)
-create_coef_map(include_features_paper, 0.82, "coef_paper", 0.95, 8)
+brfs = {"shrink":0.71, "filename": "coef_brfs", "label_font_size":1.5, "coef_font_size": 12, "fig_size":10, "title_size":18}
+paper = {"shrink":0.82, "filename": "coef_paper", "label_font_size":0.95, "coef_font_size": 8, "fig_size":10, "title_size":18}
+all = {"shrink":0.82, "filename": "coef_all", "label_font_size":1.0, "coef_font_size": 10, "fig_size":30, "title_size":30}
+
+dict = all
+if coef=="paper":
+    dict = paper
+elif coef=="brfs":
+    dict = brfs
+
+create_coef_map(dict["shrink"], dict["filename"], dict["label_font_size"], dict["coef_font_size"], dict["fig_size"], dict["title_size"])
 
 #splitting the data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
