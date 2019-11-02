@@ -1,0 +1,12 @@
+reset; model 'C:\Users\steph\Documents\Stanford Medical\Diabetes Integer Program\diabetes_int_program.mod';
+data 'C:\Users\steph\Documents\Stanford Medical\Diabetes Integer Program\diabetes_int_program.dat';
+solve; display amt_per_state;
+
+display {s in States, i in Intervals: amt_per_state[s,i]=1};
+
+model 'C:\Users\steph\Documents\Stanford Medical\Diabetes Integer Program\test_county.mod';
+ampl: data 'C:\Users\steph\Documents\Stanford Medical\Diabetes Integer Program\state_county.dat';
+
+display {c in Counties, i in Intervals: amt_per_county[c,i]=1};
+
+display {s in States: entry_state[s]=1};
