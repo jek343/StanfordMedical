@@ -15,13 +15,19 @@ class DecisionTreeBoostedRegressor(BoostedRegressor):
     when fitting a weak learner, and the second element is the maximum number of features to use
     when fitting a weak learner
     '''
-    def __init__(self, pointwise_loss, depth_range, num_features_range, weak_learner_point_percent_range):
-        BoostedRegressor.__init__(self, pointwise_loss)
+    def __init__(self, pointwise_loss,  num_learners, learner_regularizer, depth_range, num_features_range, weak_learner_point_percent_range):
+        BoostedRegressor.__init__(self, pointwise_loss, num_learners, learner_regularizer)
+        DecisionTreeBoostedRegressor.set_params(self, pointwise_loss, num_learners, learner_regularizer, depth_range, num_features_range, weak_learner_point_percent_range)
+
+    def set_params(self, pointwise_loss, num_learners, learner_regularizer, depth_range, num_features_range, weak_learner_point_percent_range):
+        BoostedRegressor.set_params(self, pointwise_loss, num_learners, learner_regularizer)
         self.__depth_range = depth_range
         self.__num_features_range = num_features_range
         self.__weak_learner_point_percent_range = weak_learner_point_percent_range
         self.__weak_decision_trees = []
         self.__features = []
+
+
 
     def _fit_weak_learner(self, X, y):
         depth = np.random.randint(self.__depth_range[0], self.__depth_range[1] + 1)

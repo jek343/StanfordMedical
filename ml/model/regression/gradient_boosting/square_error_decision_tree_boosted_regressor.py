@@ -4,8 +4,11 @@ import numpy as np
 
 class SquareErrorDecisionTreeBoostedRegressor(DecisionTreeBoostedRegressor):
 
-    def __init__(self, depth_range, num_features_range, weak_learner_point_percent_range):
-        DecisionTreeBoostedRegressor.__init__(self, PointwiseSquareErrorLoss(), depth_range, num_features_range, weak_learner_point_percent_range)
+    def __init__(self, depth_range, num_learners, learner_regularizer, num_features_range, weak_learner_point_percent_range):
+        DecisionTreeBoostedRegressor.__init__(self, PointwiseSquareErrorLoss(), num_learners, learner_regularizer, depth_range, num_features_range, weak_learner_point_percent_range)
+
+    def set_params(self, num_learners, learner_regularizer, depth_range, num_features_range, weak_learner_point_percent_range):
+        DecisionTreeBoostedRegressor.set_params(self, PointwiseSquareErrorLoss(), num_learners, learner_regularizer, depth_range, num_features_range, weak_learner_point_percent_range)
 
     '''
     gamma_m has a closed-form solution for square pointwise error, and it is
