@@ -10,6 +10,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+DATA_YEAR = 2018
+
 predict = "Premature age-adjusted mortality raw value"
 
 include_features_paper = [predict, "% Rural raw value", "Population raw value",
@@ -141,7 +143,7 @@ def get_remove_rows(csv, field_names):
     return remove_rows
 
 
-DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data2019.csv')
+DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
 FIELD_NAMES = read_fields(open_csv(DATA_PATH), 0)
 
 possible_y = ["Premature death raw value", "Life expectancy raw value",
@@ -152,7 +154,10 @@ if len(fields) == 0:
     fields = [FIELD_NAMES[i] for i in range(len(FIELD_NAMES))]
     for y in possible_y:
         if y != predict:
-            fields.remove(y)
+            try:
+                fields.remove(y)
+            except ValueError:
+                pass
 
 
 REMOVE_ROWS = get_remove_rows(open_csv(DATA_PATH), FIELD_NAMES)

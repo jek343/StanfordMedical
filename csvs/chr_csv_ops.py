@@ -3,6 +3,8 @@ import os
 import peter_csv_ops as peter_csv_ops
 import numpy as np
 
+DATA_YEAR = 2018
+
 def get_clean_fields(data_dict, field_names, min_appearance_percentage):
     field_counts = np.zeros(len(field_names), dtype = np.int)
     for pt in data_dict:
@@ -46,8 +48,8 @@ def clean_datasets(source_csv_path, ignore_rows, field_row, min_appearance_perce
 
 if __name__ == "__main__":
 
-    SOURCE_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'analytic_data2019.csv')
-    END_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'super_clean_analytic_data2019.csv')
+    SOURCE_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'analytic_data' + str(DATA_YEAR) + '.csv')
+    END_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
     IGNORE_ROWS = [0,1]
     FIELD_ROW = 0
     OUTPUT_WRITER = open(END_CSV_PATH, "w")
