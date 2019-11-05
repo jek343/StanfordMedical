@@ -7,7 +7,9 @@ from ml.model.density_regression.square_error_penalized.square_error_penalized_l
 from ml.model.density_regression.class_sampled_error_penalized.class_sampled_error_penalized_logistic_regression import ClassSampledErrorPenalizedLogisticRegression
 import ml.function.sigmoid as sigmoid
 import numpy as np
+import ml.optimization.cross_validate_grid_search as cross_validate_grid_search
 import csv
+import ml.model.regression.loss.r_squared as r_squared
 from sklearn.model_selection import train_test_split
 
 
@@ -44,7 +46,6 @@ def is_numeric_string(s):
     return s.replace('.', '', 1).isdigit()
 
 def trim_features(data_dict, remove_features):
-    print("remove features: ", remove_features)
 
     for remove_feature in remove_features:
         for i in range(len(data_dict)):
@@ -98,7 +99,11 @@ def get_remove_fields(data_dict, field_names):
             or "denominator" in field_name\
             or "FIPS" in field_name\
             or "Year" in field_name\
-            or "CI" in field_name):
+            or "CI" in field_name\
+            or field_name == "Premature death raw value"\
+            or field_name == "Injury deaths raw value"\
+            or field_name == "Life expectancy raw value"\
+            or field_name == "County Ranked (Yes=1/No=0)"):
 
             remove_features.append(field_name)
     return remove_features
@@ -113,15 +118,62 @@ REMOVE_FIELDS = get_remove_fields(DATA_DICT, FIELD_NAMES)
 DATA_DICT = trim_features(DATA_DICT, REMOVE_FIELDS)
 X, y, X_field_order = data_dict_to_dataset(DATA_DICT, "Premature age-adjusted mortality raw value")
 
+for field in X_field_order:
+    print(field)
+
 normalize_features(X)
 normalize_rates(y)
 
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
+k = 5
+xgb = SquareErrorDecisionTreeBoostedRegressor((3,5), 5, 1, (1,1), (.5,1.0))
+def xgb_param_setter_func(p):
+    num_learners = int(p[4])
+    learner_regularizer = p[1]
+    max_depth = int(p[2])
+    max_features = int(p[3])
+    min_weak_learner_point_percent = p[0]
+    depth_range = (2, max_depth)
+    num_features_range = (5, max_features)
+    weak_learner_point_percent_range = (min_weak_learner_point_percent, 1.0)
+    xgb.set_params(num_learners, learner_regularizer, depth_range, num_features_range, weak_learner_point_percent_range)
 
-print("X_train: ", X_train.shape)
-print("X_test: ", X_test.shape)
+def r_squared_error(y_hat, y):
+    return -r_squared.calc_r_squared(y_hat, y)
 
-model = SquareErrorDecisionTreeBoostedRegressor((2, 4), (X.shape[1], X.shape[1]), (0.8,1.0))
-model.train(X_train, y_train, 1000)
-print("test error: ", np.average(np.square(model.predict(X_test) - y_test)))
+def square_error(y_hat, y):
+    return np.sum(np.square(y_hat - y)) / float(y_hat.shape[0])
+
+def abs_error(y_hat, y):
+    return np.sum(np.abs(y_hat - y)) / float(y_hat.shape[0])
+
+model_error = r_squared_error
+
+
+PARAM_RANGES = np.array(\
+    [[1.0, 1.0],\
+    [0.1,1.0],\
+    [3,7],\
+    [10, X.shape[1]],\
+    [5,100]])
+
+print("X shape: ", X.shape)
+PARAM_STEPS = np.array([1.0, .1, 1, 10, 10])
+print("X_field_order: ", X_field_order)
+
+opt_params = cross_validate_grid_search.cross_validate_grid_search(X, y, k, PARAM_RANGES, PARAM_STEPS, xgb_param_setter_func, xgb.train, xgb.predict, model_error)
+
+#opt_params = np.array([1, .2, 3, 50, 100])
+print("opt_params: ", opt_params)
+
+
+import ml.data.k_fold as k_fold
+folds = k_fold.k_fold(X, y, k)
+xgb_param_setter_func(opt_params)
+print("optimal paramters CV error: ", cross_validate_grid_search.cross_validated_error(folds, xgb.train, xgb.predict, model_error))
+
+
+from sklearn.linear_model import LinearRegression
+linear_model = LinearRegression()
+print("linear regression CV error: ", cross_validate_grid_search.cross_validated_error(folds, linear_model.fit, linear_model.predict, model_error))
+print("linear model weights: ", linear_model.coef_)
