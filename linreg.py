@@ -10,7 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-DATA_YEAR = 2018
+DATA_YEAR = 2019
 
 predict = "Premature age-adjusted mortality raw value"
 
@@ -43,8 +43,8 @@ include_features_brfs = [predict,
                     "Insufficient sleep raw value", "Social associations raw value"]
 
 #if fields is [], will use all the usable & not obviously correlated features
-fields = []
-coef = "all"
+fields = include_features_paper
+coef = "paper"
 
 def open_csv(path):
     data_csv_file = open(path)
@@ -217,6 +217,10 @@ def create_coef_map(shrink, filename, label_font_size, coef_font_size, fig_size,
     plt.title('Covariance matrix showing correlation coefficients', size = title_size)
     plt.tight_layout()
     plt.savefig(filename + ".png")
+    plt.cla()
+    g = sns.pairplot(Xy[cols], size=2.0)
+    g.set(xticklabels=[], yticklabels = [])
+    plt.savefig(filename + "_pair.png")
     plt.cla()
 
 brfs = {"shrink":0.71, "filename": "coef_brfs", "label_font_size":1.5, "coef_font_size": 12, "fig_size":10, "title_size":18}
