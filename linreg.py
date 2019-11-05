@@ -164,6 +164,9 @@ DATA_DICT = trim_features(DATA_DICT, REMOVE_FIELDS)
 
 X, y, X_field_order = data_dict_to_dataset(DATA_DICT, predict)
 
+def get_clean_data():
+    return X, y, X_field_order
+
 X = pd.DataFrame(data=preprocessing.scale(X), columns=X_field_order)
 y = pd.DataFrame(data=y, columns=[predict])
 Xy = pd.concat([X, y], axis=1)
