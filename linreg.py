@@ -10,7 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-predict = "Alcohol-impaired driving deaths raw value"
+predict = "Premature age-adjusted mortality raw value"
 
 include_features_paper = [predict, "% Rural raw value", "Population raw value",
                     "% Females raw value", "% below 18 years of age raw value",
