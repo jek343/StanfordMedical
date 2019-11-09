@@ -29,7 +29,7 @@ include_features_paper = [predict, "% Rural raw value", "Population raw value",
                     "Uninsured raw value",
                     "Primary care physicians raw value",
                     "Access to exercise opportunities raw value",
-                    "Food environment index raw value"]
+                    "Food environment index raw value", "% Missing entries"]
 
 include_features_brfs = [predict,
                     "Poor physical health days raw value",
@@ -40,7 +40,8 @@ include_features_brfs = [predict,
                     "Excessive drinking raw value",
                     "Sexually transmitted infections raw value",
                     "Teen births raw value", "Diabetes prevalence raw value",
-                    "Insufficient sleep raw value", "Social associations raw value"]
+                    "Insufficient sleep raw value",
+                    "Social associations raw value", "% Missing entries"]
 
 #if fields is [], will use all the usable & not obviously correlated features
 fields = include_features_paper
@@ -134,16 +135,19 @@ def data_dict_to_dataset(data_dict, label_field_name):
 
 
 def get_remove_rows(csv, field_names):
+    '''Remove state and country level data.
+    Remove rows that the prediction is blank (i.e. '0')'''
+    pidx = field_names.index(predict)
     row_num = 0
     remove_rows = [0]
     for row in csv:
-        if row[1] == '000':
+        if row[1] == '000' or row[pidx] == '0':
             remove_rows.append(row_num)
         row_num += 1
     return remove_rows
 
 
-DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
+DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data_missing' + str(DATA_YEAR) + '.csv')
 FIELD_NAMES = read_fields(open_csv(DATA_PATH), 0)
 
 possible_y = ["Premature death raw value", "Life expectancy raw value",
