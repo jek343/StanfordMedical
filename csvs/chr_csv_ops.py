@@ -3,7 +3,7 @@ import os
 import peter_csv_ops as peter_csv_ops
 import numpy as np
 
-DATA_YEAR = 2019
+DATA_YEAR = 2018
 
 def get_clean_fields(data_dict, field_names, min_appearance_percentage):
     '''Gets fields that are at least min_appearance_percentage full to be used in new dataset'''
@@ -64,13 +64,13 @@ def clean_datasets(source_csv_path, ignore_rows, field_row, min_appearance_perce
         dict2 = {"% Missing entries" : str(missing/len(clean_fields))}
         return {**dict1,**dict2}
 
-    peter_csv_ops.csv_map(source_csv_path, field_names, clean_remap_func_missing, output_writer)
+    peter_csv_ops.csv_map(source_csv_path, field_names, clean_remap_func, output_writer)
 
 
 if __name__ == "__main__":
 
     SOURCE_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'analytic_data' + str(DATA_YEAR) + '.csv')
-    END_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'super_clean_analytic_data_missing' + str(DATA_YEAR) + '.csv')
+    END_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
     IGNORE_ROWS = [0,1]
     FIELD_ROW = 0
     OUTPUT_WRITER = open(END_CSV_PATH, "w")

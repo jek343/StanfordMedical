@@ -10,7 +10,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-DATA_YEAR = 2019
+DATA_YEAR = 2015
+PREDICT_YEAR = 2019
 
 predict = "Premature age-adjusted mortality raw value"
 
@@ -44,7 +45,7 @@ include_features_brfs = [predict,
                     "Social associations raw value", "% Missing entries"]
 
 #if fields is [], will use all the usable & not obviously correlated features
-fields = include_features_paper
+fields = []
 coef = "paper"
 
 def open_csv(path):
@@ -88,6 +89,9 @@ def is_numeric_string(s):
 
 
 def get_remove_fields(data_dict, field_names, field_subset):
+    """
+    Returns a list of features to remove
+    """
     remove_features = []
     for d in data_dict:
         for feature in d:
@@ -98,7 +102,7 @@ def get_remove_fields(data_dict, field_names, field_subset):
         if field_name not in remove_features and \
             ("numerator" in field_name
                 or "denominato" in field_name
-                or "FIPS" in field_name
+                or ("FIPS" in field_name and field_name != "5-digit FIPS Code")
                 or "Year" in field_name
                 or "CI" in field_name
                 or field_name == "County Ranked (Yes=1/No=0)"
@@ -109,7 +113,19 @@ def get_remove_fields(data_dict, field_names, field_subset):
     return remove_features
 
 
+def trim_fips(data_dict):
+    """
+    Removes the feature 5-digit FIPS code from data_dict
+    """
+    for i in range(len(data_dict)):
+        del data_dict[i]['5-digit FIPS Code']
+    return data_dict
+
+
 def trim_features(data_dict, remove_features):
+    """
+    Removes the features in remove_features from data_dict
+    """
     for remove_feature in remove_features:
         for i in range(len(data_dict)):
             del data_dict[i][remove_feature]
@@ -147,8 +163,10 @@ def get_remove_rows(csv, field_names):
     return remove_rows
 
 
-DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data_missing' + str(DATA_YEAR) + '.csv')
+DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
+P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
 FIELD_NAMES = read_fields(open_csv(DATA_PATH), 0)
+P_FIELD_NAMES = read_fields(open_csv(P_DATA_PATH), 0)
 
 possible_y = ["Premature death raw value", "Life expectancy raw value",
 "Injury deaths raw value", "Premature age-adjusted mortality raw value",
@@ -163,18 +181,58 @@ if len(fields) == 0:
             except ValueError:
                 pass
 
+def get_fips_predict_dict(p_data_dict, p_field_names):
+    """
+    Returns a dictionary mapping the 5-digit FIPS code to the respective value
+    in predict, using the data from PREDICT_YEAR
+    """
+    fips_predict_dict = {}
+
+    for county in p_data_dict:
+        fips_predict_dict.update({county['5-digit FIPS Code']: county[predict]})
+
+    return fips_predict_dict
+
+
+def get_predict_list(data_dict, fips_predict_dict):
+    """
+    Returns the list of values of predict from PREDICT_YEAR in the order
+    of data_dict & deletes values without a corresponding prediction from
+    data_dict
+    """
+    lst = []
+    remove = []
+
+    for county in data_dict:
+        if county['5-digit FIPS Code'] in fips_predict_dict:
+            lst.append(float(fips_predict_dict[county['5-digit FIPS Code']]))
+        else:
+            remove.append(county)
+
+    for county in remove:
+        data_dict.remove(county)
+
+    return data_dict, lst
+
 
 REMOVE_ROWS = get_remove_rows(open_csv(DATA_PATH), FIELD_NAMES)
 DATA_DICT = get_data_as_dicts(open_csv(DATA_PATH), REMOVE_ROWS, FIELD_NAMES)
-
+P_DATA_DICT = get_data_as_dicts(open_csv(P_DATA_PATH), [], P_FIELD_NAMES)
+FIPS_PREDICT_DICT = get_fips_predict_dict(P_DATA_DICT, P_FIELD_NAMES)
 REMOVE_FIELDS = get_remove_fields(DATA_DICT, FIELD_NAMES, fields)
-
 DATA_DICT = trim_features(DATA_DICT, REMOVE_FIELDS)
+DATA_DICT, PRED_LST = get_predict_list(DATA_DICT, FIPS_PREDICT_DICT)
+DATA_DICT = trim_fips(DATA_DICT)
 
 X, y, X_field_order = data_dict_to_dataset(DATA_DICT, predict)
+y = PRED_LST
 
-def get_clean_data():
-    return X, y, X_field_order
+# print(y)
+# print(DATA_DICT)
+
+# def get_clean_data():
+#     return X, y, X_field_order
+
 
 X = pd.DataFrame(data=preprocessing.scale(X), columns=X_field_order)
 y = pd.DataFrame(data=y, columns=[predict])
@@ -186,7 +244,8 @@ X /= np.max(X, axis=1)[:, np.newaxis]
 y -= y.min()
 y /= y.max()
 
-#calculate correlation between X and y and print in decreasing magnitude
+
+# calculate correlation between X and y and print in decreasing magnitude
 def corr_coef_Xy_dec_mag(Xy):
     correlation = Xy.corr()[y.columns[0]][:]
     order = correlation.map(lambda x : abs(x)).sort_values(ascending = False)
@@ -237,7 +296,7 @@ if coef=="paper":
 elif coef=="brfs":
     dict = brfs
 
-create_coef_map(dict["shrink"], dict["filename"], dict["label_font_size"], dict["coef_font_size"], dict["fig_size"], dict["title_size"])
+# create_coef_map(dict["shrink"], dict["filename"], dict["label_font_size"], dict["coef_font_size"], dict["fig_size"], dict["title_size"])
 
 #splitting the data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
