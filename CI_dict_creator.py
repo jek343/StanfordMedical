@@ -8,9 +8,9 @@ def get_CI_dict(year):
     dataset = pd.read_csv(os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(year) + '.csv'))
     features = list(dataset)
     features_raw = [i[:-10] for i in features if "raw value" in i]
-    features_CI = [i[:-7] for i in features if "CI low" in i]
+    # features_CI = [i[:-7] for i in features if "CI low" in i]
     # print(*features_CI, sep = "\n")
-    features_num = [i[:-10] for i in features if "numerator" in i]
+    # features_num = [i[:-10] for i in features if "numerator" in i]
     # print(*features_CI, sep = "\n")
 
     for index, row in dataset.iterrows():
@@ -22,16 +22,14 @@ def get_CI_dict(year):
             high = None
             numerator = None
             denom = None
-            if feat in features_CI:
-                if feat + " CI low" in features:
-                    low = row[feat + " CI low"]
-                if feat + " CI high" in features:
-                    high = row[feat + " CI high"]
-            elif feat in features_num:
-                if feat + " numerator" in features:
-                    numerator = row[feat + " numerator"]
-                if feat + " denominator" in features:
-                    denom = row[feat + " denominator"]
+            if feat + " CI low" in features:
+                low = row[feat + " CI low"]
+            if feat + " CI high" in features:
+                high = row[feat + " CI high"]
+            if feat + " numerator" in features:
+                numerator = row[feat + " numerator"]
+            if feat + " denominator" in features:
+                denom = row[feat + " denominator"]
             row_dict[feat] = (low, actual, high, numerator, denom)
         CI_dict[fips] = row_dict
     return CI_dict
