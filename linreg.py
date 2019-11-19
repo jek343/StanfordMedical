@@ -44,8 +44,8 @@ include_features_brfs = [predict,
                     "Social associations raw value", "% Missing entries"]
 
 #if fields is [], will use all the usable & not obviously correlated features
-fields = include_features_paper
-coef = "paper"
+fields = include_features_brfs
+coef = "brfs"
 
 def open_csv(path):
     data_csv_file = open(path)
@@ -175,6 +175,7 @@ X, y, X_field_order = data_dict_to_dataset(DATA_DICT, predict)
 
 def get_clean_data():
     return X, y, X_field_order
+
 
 X = pd.DataFrame(data=preprocessing.scale(X), columns=X_field_order)
 y = pd.DataFrame(data=y, columns=[predict])
