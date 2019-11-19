@@ -3,7 +3,7 @@ import os
 import peter_csv_ops as peter_csv_ops
 import numpy as np
 
-DATA_YEAR = 2019
+DATA_YEAR = 2018
 
 def get_clean_fields(data_dict, field_names, min_appearance_percentage):
     '''Gets fields that are at least min_appearance_percentage full to be used in new dataset'''
@@ -64,13 +64,51 @@ def clean_datasets(source_csv_path, ignore_rows, field_row, min_appearance_perce
         dict2 = {"% Missing entries" : str(missing/len(clean_fields))}
         return {**dict1,**dict2}
 
-    peter_csv_ops.csv_map(source_csv_path, field_names, clean_remap_func_missing, output_writer)
+    peter_csv_ops.csv_map(source_csv_path, field_names, clean_remap_func, output_writer)
 
+
+def get_fips_predict_dict(p_data_dict, p_field_names):
+    """
+    Returns a dictionary mapping the 5-digit FIPS code to the respective value
+    in predict, using the data from PREDICT_YEAR
+    """
+    fips_predict_dict = {}
+
+    for county in p_data_dict:
+        fips_predict_dict.update({county['5-digit FIPS Code']: county[predict]})
+
+    return fips_predict_dict
+
+
+def get_predict_list(data_dict, fips_predict_dict):
+    """
+    Returns the list of values in the predict column from the PREDICT_YEAR
+    dataset & deletes values from data_dict without a corresponding prediction
+    in fips_predict_dict.
+    The prediction values are in the order of data_dict.
+
+    REQUIRES: fips_predict_dict is a dictionary mapping the 5-digit FIPS code
+    of each county in the PREDICT_YEAR dataset to the county's corresponding
+    value in the predict column
+    """
+    lst = []
+    remove = []
+
+    for county in data_dict:
+        if county['5-digit FIPS Code'] in fips_predict_dict:
+            lst.append(float(fips_predict_dict[county['5-digit FIPS Code']]))
+        else:
+            remove.append(county)
+
+    for county in remove:
+        data_dict.remove(county)
+
+    return data_dict, lst
 
 if __name__ == "__main__":
 
     SOURCE_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'analytic_data' + str(DATA_YEAR) + '.csv')
-    END_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'super_clean_analytic_data_missing' + str(DATA_YEAR) + '.csv')
+    END_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
     IGNORE_ROWS = [0,1]
     FIELD_ROW = 0
     OUTPUT_WRITER = open(END_CSV_PATH, "w")
