@@ -67,6 +67,44 @@ def clean_datasets(source_csv_path, ignore_rows, field_row, min_appearance_perce
     peter_csv_ops.csv_map(source_csv_path, field_names, clean_remap_func, output_writer)
 
 
+def get_fips_predict_dict(p_data_dict, p_field_names):
+    """
+    Returns a dictionary mapping the 5-digit FIPS code to the respective value
+    in predict, using the data from PREDICT_YEAR
+    """
+    fips_predict_dict = {}
+
+    for county in p_data_dict:
+        fips_predict_dict.update({county['5-digit FIPS Code']: county[predict]})
+
+    return fips_predict_dict
+
+
+def get_predict_list(data_dict, fips_predict_dict):
+    """
+    Returns the list of values in the predict column from the PREDICT_YEAR
+    dataset & deletes values from data_dict without a corresponding prediction
+    in fips_predict_dict.
+    The prediction values are in the order of data_dict.
+
+    REQUIRES: fips_predict_dict is a dictionary mapping the 5-digit FIPS code
+    of each county in the PREDICT_YEAR dataset to the county's corresponding
+    value in the predict column
+    """
+    lst = []
+    remove = []
+
+    for county in data_dict:
+        if county['5-digit FIPS Code'] in fips_predict_dict:
+            lst.append(float(fips_predict_dict[county['5-digit FIPS Code']]))
+        else:
+            remove.append(county)
+
+    for county in remove:
+        data_dict.remove(county)
+
+    return data_dict, lst
+
 if __name__ == "__main__":
 
     SOURCE_CSV_PATH = os.path.join(os.getcwd(),  '../..', 'datasets', 'analytic_data' + str(DATA_YEAR) + '.csv')

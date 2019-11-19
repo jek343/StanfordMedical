@@ -10,7 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-DATA_YEAR = 2015
+DATA_YEAR = 2018
 PREDICT_YEAR = 2019
 
 predict = "Premature age-adjusted mortality raw value"
@@ -181,6 +181,7 @@ if len(fields) == 0:
             except ValueError:
                 pass
 
+
 def get_fips_predict_dict(p_data_dict, p_field_names):
     """
     Returns a dictionary mapping the 5-digit FIPS code to the respective value
@@ -196,9 +197,14 @@ def get_fips_predict_dict(p_data_dict, p_field_names):
 
 def get_predict_list(data_dict, fips_predict_dict):
     """
-    Returns the list of values of predict from PREDICT_YEAR in the order
-    of data_dict & deletes values without a corresponding prediction from
-    data_dict
+    Returns the list of values in the predict column from the PREDICT_YEAR
+    dataset & deletes values from data_dict without a corresponding prediction
+    in fips_predict_dict.
+    The prediction values are in the order of data_dict.
+
+    REQUIRES: fips_predict_dict is a dictionary mapping the 5-digit FIPS code
+    of each county in the PREDICT_YEAR dataset to the county's corresponding
+    value in the predict column
     """
     lst = []
     remove = []
