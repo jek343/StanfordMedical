@@ -108,7 +108,7 @@ def get_remove_fields(data_dict, field_names, field_subset):
                 or field_name == "County Ranked (Yes=1/No=0)"
                 or field_name == "State Abbreviation"
                 or field_name == "Name"
-                or field_name not in field_subset):
+                or (field_name not in field_subset and field_name != "5-digit FIPS Code")):
             remove_features.append(field_name)
     return remove_features
 
@@ -232,14 +232,6 @@ DATA_DICT = trim_fips(DATA_DICT)
 
 X, y, X_field_order = data_dict_to_dataset(DATA_DICT, predict)
 y = PRED_LST
-
-# print(y)
-# print(DATA_DICT)
-
-# def get_clean_data():
-#     return X, y, X_field_order
-
-
 
 X = pd.DataFrame(data=preprocessing.scale(X), columns=X_field_order)
 y = pd.DataFrame(data=y, columns=[predict])
