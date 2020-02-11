@@ -45,8 +45,8 @@ include_features_brfs = [predict,
                     "Social associations raw value", "% Missing entries"]
 
 #if fields is [], will use all the usable & not obviously correlated features
-fields = include_features_brfs
-coef = "brfs"
+fields = []
+coef = "all"
 
 def open_csv(path):
     data_csv_file = open(path)
@@ -165,8 +165,70 @@ def get_remove_rows(csv, field_names):
 
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
 P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
-FIELD_NAMES = read_fields(open_csv(DATA_PATH), 0)
-P_FIELD_NAMES = read_fields(open_csv(P_DATA_PATH), 0)
+FIELD_NAMES = read_fields(open_csv(DATA_PATH), 0) #column names
+P_FIELD_NAMES = read_fields(open_csv(P_DATA_PATH), 0) #column names
+
+#---------------------new code
+prev_year = pd.read_csv(DATA_PATH)
+curr_year = pd.read_csv(P_DATA_PATH)
+
+def remove_rows_cols(data):
+    #rename row indexes to fips code
+    data.rename(index = dict(zip(data.index, data['5-digit FIPS Code'])), inplace = True)
+    #drop rows that do not have mortality
+    data.dropna(axis='index', subset = [predict], inplace = True)
+    #drop rows and columns that have missing values
+    data.dropna(inplace = True)
+    #only include numeric columns
+    data.select_dtypes(include=[np.number])
+    cols = data.columns
+    cols_to_remove = filter(lambda col: "numerator" in col or "denominato" in col or \
+                            "FIPS" in col or "CI" in col or "Year" in col or \
+                            col in ["County Ranked (Yes=1/No=0)", "State Abbreviation", "Name",
+                            "Premature death raw value", "Life expectancy raw value",
+                            "Injury deaths raw value", "Alcohol-impaired driving deaths raw value"], cols)
+    data.drop(columns=list(cols_to_remove), inplace = True)
+    return data
+
+curr_year = remove_rows_cols(curr_year)
+prev_year = remove_rows_cols(prev_year)
+
+def deltas(prev_year, curr_year):
+    #only keep counties that are in both years
+    curr_rows = set(curr_year.index)
+    prev_rows = set(prev_year.index)
+    indexes = curr_rows.intersection(prev_rows)
+    drop_curr = curr_rows - indexes
+    drop_prev = prev_rows - indexes
+    prev_year.drop(index=list(drop_prev), inplace = True)
+    curr_year.drop(index=list(drop_curr), inplace = True)
+
+    #only keep columns that are in both years
+    curr_cols = set(curr_year.columns)
+    prev_cols = set(prev_year.columns)
+    cols = curr_cols.intersection(prev_cols)
+    drop_curr = curr_cols - cols
+    drop_prev = prev_cols - cols
+    prev_year.drop(columns=list(drop_prev), inplace = True)
+    curr_year.drop(columns=list(drop_curr), inplace = True)
+
+    prev_y = prev_year[predict]
+    curr_y = curr_year[predict]
+    prev_year.drop(columns=[predict], inplace = True)
+    curr_year.drop(columns=[predict], inplace = True)
+    delta = curr_year - prev_year
+    delta -= np.min(delta, axis=0)
+    delta /= np.max(delta, axis=0)
+    delta.dropna(axis='columns', how='all', inplace = True)
+    delta.fillna(value=0.0, inplace=True)
+    delta_X = pd.concat([delta, prev_y], axis=1)
+    print(delta_X.head())
+    return delta_X, curr_y
+
+
+delta_X, curr_y = deltas(prev_year, curr_year)
+
+#-------------------end new code
 
 possible_y = ["Premature death raw value", "Life expectancy raw value",
 "Injury deaths raw value", "Premature age-adjusted mortality raw value",
@@ -220,14 +282,25 @@ def get_predict_list(data_dict, fips_predict_dict):
 
     return data_dict, lst
 
-
+#removes first two rows (feature names), state, and country data
 REMOVE_ROWS = get_remove_rows(open_csv(DATA_PATH), FIELD_NAMES)
+
+#creates lists of dictionaries of all rows and columns excepts rows in remove_rows
 DATA_DICT = get_data_as_dicts(open_csv(DATA_PATH), REMOVE_ROWS, FIELD_NAMES)
 P_DATA_DICT = get_data_as_dicts(open_csv(P_DATA_PATH), [], P_FIELD_NAMES)
+
+#creates dictionary fips : mortality rate in p_data_dict
 FIPS_PREDICT_DICT = get_fips_predict_dict(P_DATA_DICT, P_FIELD_NAMES)
+
+#removes fields that are not a certain % full and non-numeric columns
 REMOVE_FIELDS = get_remove_fields(DATA_DICT, FIELD_NAMES, fields)
 DATA_DICT = trim_features(DATA_DICT, REMOVE_FIELDS)
+
+#creates list of mortalities from dictionary of mortalities
+#if there is no mortality for a county, removes the county from data_dict
 DATA_DICT, PRED_LST = get_predict_list(DATA_DICT, FIPS_PREDICT_DICT)
+
+#removes the fips code from the data_dict
 DATA_DICT = trim_fips(DATA_DICT)
 
 X, y, X_field_order = data_dict_to_dataset(DATA_DICT, predict)
@@ -306,22 +379,20 @@ y_test = y_test.iloc[:, 0]
 clf = LinearRegression()
 clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
 clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
+clf_delta = LinearRegression()
 
 #fitting the models
 clf = clf.fit(X_train, y_train)
 clf1 = clf1.fit(X_train, y_train)
 clf2 = clf2.fit(X_train, y_train)
+clfdelta = clf_delta.fit(delta_X, curr_y)
 
 #predicting the outputs
 pred_y = clf.predict(X_test)  # [:,0]
 pred_y1 = clf1.predict(X_test)
 pred_y2 = clf2.predict(X_test)
-
-
-#  clf.score(X_test, y_test)
-# print(('prediction', 'mortality ratio'))
-# for i in range(20):
-#     print((np.array(pred_y)[i], np.array(y_test)[i]))
+pred_delta = clf_delta.predict(delta_X)
+print('r2 delta', r2_score(curr_y, pred_delta))
 
 #analyzing performance of models
 print('mean absolute error', mean_absolute_error(y_test, pred_y))
