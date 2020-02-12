@@ -227,6 +227,7 @@ def deltas(prev_year, curr_year):
 
 
 delta_X, curr_y = deltas(prev_year, curr_year)
+x_train, x_test, y_train, y_test= train_test_split(delta_X, curr_y, test_size=0.2, random_state=0)
 
 #-------------------end new code
 
@@ -371,9 +372,9 @@ elif coef=="brfs":
 # create_coef_map(dict["shrink"], dict["filename"], dict["label_font_size"], dict["coef_font_size"], dict["fig_size"], dict["title_size"])
 
 #splitting the data
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
-y_train = y_train.iloc[:, 0]
-y_test = y_test.iloc[:, 0]
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+# y_train = y_train.iloc[:, 0]
+# y_test = y_test.iloc[:, 0]
 
 #creating the models
 clf = LinearRegression()
@@ -382,15 +383,21 @@ clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
 clf_delta = LinearRegression()
 
 #fitting the models
-clf = clf.fit(X_train, y_train)
-clf1 = clf1.fit(X_train, y_train)
-clf2 = clf2.fit(X_train, y_train)
+# clf = clf.fit(X_train, y_train)
+# clf1 = clf1.fit(X_train, y_train)
+# clf2 = clf2.fit(X_train, y_train)
+clf = clf.fit(x_train, y_train)
+clf1 = clf1.fit(x_train, y_train)
+clf2 = clf2.fit(x_train, y_train)
 clfdelta = clf_delta.fit(delta_X, curr_y)
 
 #predicting the outputs
-pred_y = clf.predict(X_test)  # [:,0]
-pred_y1 = clf1.predict(X_test)
-pred_y2 = clf2.predict(X_test)
+# pred_y = clf.predict(X_test)  # [:,0]
+# pred_y1 = clf1.predict(X_test)
+# pred_y2 = clf2.predict(X_test)
+pred_y = clf.predict(x_test)  # [:,0]
+pred_y1 = clf1.predict(x_test)
+pred_y2 = clf2.predict(x_test)
 pred_delta = clf_delta.predict(delta_X)
 print('r2 delta', r2_score(curr_y, pred_delta))
 
