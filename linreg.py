@@ -15,6 +15,12 @@ PREDICT_YEAR = 2019
 
 predict = "Premature age-adjusted mortality raw value"
 
+possible_y = ["Premature death raw value", "Life expectancy raw value",
+"Injury deaths raw value", "Premature age-adjusted mortality raw value",
+"Alcohol-impaired driving deaths raw value"]
+
+assert predict in possible_y
+
 include_features_paper = [predict, "% Rural raw value", "Population raw value",
                     "% Females raw value", "% below 18 years of age raw value",
                     "% 65 and older raw value",
@@ -184,16 +190,16 @@ def remove_rows_cols(data):
     cols = data.columns
     cols_to_remove = filter(lambda col: "numerator" in col or "denominato" in col or \
                             "FIPS" in col or "CI" in col or "Year" in col or \
-                            col in ["County Ranked (Yes=1/No=0)", "State Abbreviation", "Name",
-                            "Premature death raw value", "Life expectancy raw value",
-                            "Injury deaths raw value", "Alcohol-impaired driving deaths raw value"], cols)
+                            col in ["County Ranked (Yes=1/No=0)", "State Abbreviation", "Name"] or \
+                            (col in possible_y and col != predict), cols)
     data.drop(columns=list(cols_to_remove), inplace = True)
     return data
 
 curr_year = remove_rows_cols(curr_year)
 prev_year = remove_rows_cols(prev_year)
 
-def deltas(prev_year, curr_year):
+def data_both_years(prev_year, curr_year):
+    '''Keeps county info (rows) that are in both years' datasets using 5-digit FIPS code as unique identifier'''
     #only keep counties that are in both years
     curr_rows = set(curr_year.index)
     prev_rows = set(prev_year.index)
@@ -211,9 +217,34 @@ def deltas(prev_year, curr_year):
     drop_prev = prev_cols - cols
     prev_year.drop(columns=list(drop_prev), inplace = True)
     curr_year.drop(columns=list(drop_curr), inplace = True)
+    return prev_year, curr_year
 
+prev_year, curr_year = data_both_years(prev_year, curr_year)
+
+def get_x(year):
+    '''Gets all the normalized "x" data (socioeconomic & demographic, not the mortality) for year
+    Note: columns are still labeled with FIPS'''
+    x = year.drop(columns=[predict]) #note need inplace false (default)
+    x -= np.min(x, axis=0)
+    x /= np.max(x, axis=0)
+    return x
+
+def get_y(year):
+    '''Gets the normalized mortality for the given year
+    Note: columns are still labeled with FIPS'''
+    y = year[predict]
+    y -= np.min(y, axis=0)
+    y /= np.max(y, axis=0)
+    return y
+
+prev_x = get_x(prev_year)
+curr_y = get_y(curr_year)
+x_train, x_test, y_train, y_test = train_test_split(prev_x, curr_y, test_size=0.2, random_state=0)
+
+def deltas(prev_year, curr_year):
     prev_y = prev_year[predict]
     curr_y = curr_year[predict]
+    curr_y -= np.min(curr_y, axis=0)
     curr_y /= np.max(curr_y, axis=0)
     prev_year.drop(columns=[predict], inplace = True)
     curr_year.drop(columns=[predict], inplace = True)
@@ -231,14 +262,11 @@ def deltas(prev_year, curr_year):
     return delta_X, curr_y
 
 
-delta_X, curr_y = deltas(prev_year, curr_year)
-x_train, x_test, y_train, y_test= train_test_split(delta_X, curr_y, test_size=0.2, random_state=0)
+delta_X, delta_Y = deltas(prev_year, curr_year)
+x_train_d, x_test_d, y_train_d, y_test_d= train_test_split(delta_X, delta_Y, test_size=0.2, random_state=0)
+
 
 #-------------------end new code
-
-possible_y = ["Premature death raw value", "Life expectancy raw value",
-"Injury deaths raw value", "Premature age-adjusted mortality raw value",
-"Alcohol-impaired driving deaths raw value"]
 
 if len(fields) == 0:
     fields = [FIELD_NAMES[i] for i in range(len(FIELD_NAMES))]
@@ -382,10 +410,13 @@ elif coef=="brfs":
 # y_test = y_test.iloc[:, 0]
 
 #creating the models
+clf_d = LinearRegression()
+clf1_d = Lasso(alpha=0.0001, fit_intercept=True)  # l1
+clf2_d = Ridge(alpha=0.1, fit_intercept=True)  # l2
+# clf_delta = LinearRegression()
 clf = LinearRegression()
 clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
 clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
-# clf_delta = LinearRegression()
 
 #fitting the models
 # clf = clf.fit(X_train, y_train)
@@ -407,7 +438,7 @@ pred_y2 = clf2.predict(x_test)
 # print('r2 delta', r2_score(curr_y, pred_delta))
 
 #analyzing performance of models
-def print_performance(title, actual, prediction, clf):
+def print_performance(title, actual, prediction, clf, train):
     print("\n" + title)
     print('mean absolute error', mean_absolute_error(actual, prediction))
     print('r2', r2_score(actual, prediction))
@@ -419,7 +450,7 @@ def print_performance(title, actual, prediction, clf):
     for i, txt in enumerate(clf.coef_):
         if abs(txt) > 0.05:
             ax.annotate(i, (i+0.5,txt), fontsize=7)
-            print(i, x_train.columns[i], txt)
+            print(i, train.columns[i], txt)
 
 
     plt.xlabel("Index of feature")
@@ -429,6 +460,6 @@ def print_performance(title, actual, prediction, clf):
     plt.savefig('weights.png')
     plt.clf()
 
-print_performance("Unregularized", y_test, pred_y, clf)
-print_performance("L1", y_test, pred_y1, clf1)
-print_performance("L2", y_test, pred_y2, clf2)
+print_performance("Unregularized", y_test, pred_y, clf, x_train)
+print_performance("L1", y_test, pred_y1, clf1, x_train)
+print_performance("L2", y_test, pred_y2, clf2, x_train)
