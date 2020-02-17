@@ -10,7 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-DATA_YEAR = 2019
+DATA_YEAR = 2018
 PREDICT_YEAR = 2019
 
 predict = "Premature age-adjusted mortality raw value"
@@ -59,120 +59,8 @@ def open_csv(path):
     return csv.reader(data_csv_file, delimiter=',')
 
 
-def read_fields(csv, field_row):
-    row_num = 0
-    for row in csv:
-        if row_num == field_row:
-            out = []
-            for x in row:
-                out.append(x)
-            return out
-        row_num += 1
-    return None
-
-
-def get_data_as_dicts(csv, ignore_rows, field_names):
-    row_num = 0
-    D = []
-    for row in csv:
-        if not row_num in ignore_rows:
-            i = 0
-            d = {}
-            for x in row:
-                field = field_names[i]
-                d[field] = x
-                i += 1
-            D.append(d)
-        row_num += 1
-    return D
-
-
-def is_numeric_string(s):
-    s.replace('.', '', 1).isdigit()
-    s.replace('E', '', 1).isdigit()
-    s.replace('-', '', 1).isdigit()
-    return s
-
-
-def get_remove_fields(data_dict, field_names, field_subset):
-    """
-    Returns a list of features to remove
-    """
-    remove_features = []
-    for d in data_dict:
-        for feature in d:
-            if feature not in remove_features and not is_numeric_string(d[feature]):
-                remove_features.append(feature)
-
-    for field_name in field_names:
-        if field_name not in remove_features and \
-            ("numerator" in field_name
-                or "denominato" in field_name
-                or ("FIPS" in field_name and field_name != "5-digit FIPS Code")
-                or "Year" in field_name
-                or "CI" in field_name
-                or field_name == "County Ranked (Yes=1/No=0)"
-                or field_name == "State Abbreviation"
-                or field_name == "Name"
-                or (field_name not in field_subset and field_name != "5-digit FIPS Code")):
-            remove_features.append(field_name)
-    return remove_features
-
-
-def trim_fips(data_dict):
-    """
-    Removes the feature 5-digit FIPS code from data_dict
-    """
-    for i in range(len(data_dict)):
-        del data_dict[i]['5-digit FIPS Code']
-    return data_dict
-
-
-def trim_features(data_dict, remove_features):
-    """
-    Removes the features in remove_features from data_dict
-    """
-    for remove_feature in remove_features:
-        for i in range(len(data_dict)):
-            del data_dict[i][remove_feature]
-    return data_dict
-
-
-def data_dict_to_dataset(data_dict, label_field_name):
-    X_field_order = []
-    for d_feature in data_dict[0]:
-        if d_feature != label_field_name:
-            X_field_order.append(d_feature)
-
-    X = np.zeros((len(data_dict), len(data_dict[0]) - 1), dtype=np.float64)
-
-    y = np.zeros(len(data_dict), dtype=np.float64)
-    for i in range(len(data_dict)):
-        d = data_dict[i]
-        for j in range(len(X_field_order)):
-            X[i, j] = float(d[X_field_order[j]])
-        y[i] = float(d[label_field_name])
-
-    return X, y, X_field_order
-
-
-def get_remove_rows(csv, field_names):
-    '''Remove state and country level data.
-    Remove rows that the prediction is blank (i.e. '0')'''
-    pidx = field_names.index(predict)
-    row_num = 0
-    remove_rows = [0]
-    for row in csv:
-        if row[1] == '000' or row[pidx] == '0':
-            remove_rows.append(row_num)
-        row_num += 1
-    return remove_rows
-
-
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
 P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
-FIELD_NAMES = read_fields(open_csv(DATA_PATH), 0) #column names
-P_FIELD_NAMES = read_fields(open_csv(P_DATA_PATH), 0) #column names
 
 #---------------------new code
 prev_year = pd.read_csv(DATA_PATH)
@@ -265,92 +153,6 @@ def deltas(prev_year, curr_year):
 delta_X, delta_Y = deltas(prev_year, curr_year)
 x_train_d, x_test_d, y_train_d, y_test_d= train_test_split(delta_X, delta_Y, test_size=0.2, random_state=0)
 
-
-#-------------------end new code
-
-if len(fields) == 0:
-    fields = [FIELD_NAMES[i] for i in range(len(FIELD_NAMES))]
-    for y in possible_y:
-        if y != predict:
-            try:
-                fields.remove(y)
-            except ValueError:
-                pass
-
-
-def get_fips_predict_dict(p_data_dict, p_field_names):
-    """
-    Returns a dictionary mapping the 5-digit FIPS code to the respective value
-    in predict, using the data from PREDICT_YEAR
-    """
-    fips_predict_dict = {}
-
-    for county in p_data_dict:
-        fips_predict_dict.update({county['5-digit FIPS Code']: county[predict]})
-
-    return fips_predict_dict
-
-
-def get_predict_list(data_dict, fips_predict_dict):
-    """
-    Returns the list of values in the predict column from the PREDICT_YEAR
-    dataset & deletes values from data_dict without a corresponding prediction
-    in fips_predict_dict.
-    The prediction values are in the order of data_dict.
-
-    REQUIRES: fips_predict_dict is a dictionary mapping the 5-digit FIPS code
-    of each county in the PREDICT_YEAR dataset to the county's corresponding
-    value in the predict column
-    """
-    lst = []
-    remove = []
-
-    for county in data_dict:
-        if county['5-digit FIPS Code'] in fips_predict_dict:
-            lst.append(float(fips_predict_dict[county['5-digit FIPS Code']]))
-        else:
-            remove.append(county)
-
-    for county in remove:
-        data_dict.remove(county)
-
-    return data_dict, lst
-
-#removes first two rows (feature names), state, and country data
-REMOVE_ROWS = get_remove_rows(open_csv(DATA_PATH), FIELD_NAMES)
-
-#creates lists of dictionaries of all rows and columns excepts rows in remove_rows
-DATA_DICT = get_data_as_dicts(open_csv(DATA_PATH), REMOVE_ROWS, FIELD_NAMES)
-P_DATA_DICT = get_data_as_dicts(open_csv(P_DATA_PATH), [], P_FIELD_NAMES)
-
-#creates dictionary fips : mortality rate in p_data_dict
-FIPS_PREDICT_DICT = get_fips_predict_dict(P_DATA_DICT, P_FIELD_NAMES)
-
-#removes fields that are not a certain % full and non-numeric columns
-REMOVE_FIELDS = get_remove_fields(DATA_DICT, FIELD_NAMES, fields)
-DATA_DICT = trim_features(DATA_DICT, REMOVE_FIELDS)
-
-#creates list of mortalities from dictionary of mortalities
-#if there is no mortality for a county, removes the county from data_dict
-DATA_DICT, PRED_LST = get_predict_list(DATA_DICT, FIPS_PREDICT_DICT)
-
-#removes the fips code from the data_dict
-DATA_DICT = trim_fips(DATA_DICT)
-
-X, y, X_field_order = data_dict_to_dataset(DATA_DICT, predict)
-y = PRED_LST
-
-X = pd.DataFrame(data=preprocessing.scale(X), columns=X_field_order)
-y = pd.DataFrame(data=y, columns=[predict])
-Xy = pd.concat([X, y], axis=1)
-
-X -= np.min(X, axis=1)[:, np.newaxis]
-X /= np.max(X, axis=1)[:, np.newaxis]
-
-y -= y.min()
-y /= y.max()
-
-
 # calculate correlation between X and y and print in decreasing magnitude
 def corr_coef_Xy_dec_mag(Xy):
     correlation = Xy.corr()[y.columns[0]][:]
@@ -404,38 +206,20 @@ elif coef=="brfs":
 
 # create_coef_map(dict["shrink"], dict["filename"], dict["label_font_size"], dict["coef_font_size"], dict["fig_size"], dict["title_size"])
 
-#splitting the data
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
-# y_train = y_train.iloc[:, 0]
-# y_test = y_test.iloc[:, 0]
-
 #creating the models
-clf_d = LinearRegression()
-clf1_d = Lasso(alpha=0.0001, fit_intercept=True)  # l1
-clf2_d = Ridge(alpha=0.1, fit_intercept=True)  # l2
-# clf_delta = LinearRegression()
 clf = LinearRegression()
 clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
 clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
 
 #fitting the models
-# clf = clf.fit(X_train, y_train)
-# clf1 = clf1.fit(X_train, y_train)
-# clf2 = clf2.fit(X_train, y_train)
 clf = clf.fit(x_train, y_train)
 clf1 = clf1.fit(x_train, y_train)
 clf2 = clf2.fit(x_train, y_train)
-# clfdelta = clf_delta.fit(delta_X, curr_y)
 
 #predicting the outputs
-# pred_y = clf.predict(X_test)  # [:,0]
-# pred_y1 = clf1.predict(X_test)
-# pred_y2 = clf2.predict(X_test)
-pred_y = clf.predict(x_test)  # [:,0]
+pred_y = clf.predict(x_test)
 pred_y1 = clf1.predict(x_test)
 pred_y2 = clf2.predict(x_test)
-# pred_delta = clf_delta.predict(delta_X)
-# print('r2 delta', r2_score(curr_y, pred_delta))
 
 #analyzing performance of models
 def print_performance(title, actual, prediction, clf, train):
@@ -463,3 +247,20 @@ def print_performance(title, actual, prediction, clf, train):
 print_performance("Unregularized", y_test, pred_y, clf, x_train)
 print_performance("L1", y_test, pred_y1, clf1, x_train)
 print_performance("L2", y_test, pred_y2, clf2, x_train)
+
+if PREDICT_YEAR != DATA_YEAR:
+    clf_d = LinearRegression()
+    clf1_d = Lasso(alpha=0.0001, fit_intercept=True)  # l1
+    clf2_d = Ridge(alpha=0.1, fit_intercept=True)  # l2
+
+    clf_d = clf_d.fit(x_train_d, y_train_d)
+    clf1_d = clf1_d.fit(x_train_d, y_train_d)
+    clf2_d = clf2_d.fit(x_train_d, y_train_d)
+
+    pred_y_d = clf_d.predict(x_test_d)
+    pred_y1_d = clf1_d.predict(x_test_d)
+    pred_y2_d = clf2_d.predict(x_test_d)
+
+    print_performance("Delta Unregularized", y_test_d, pred_y_d, clf_d, x_train_d)
+    print_performance("Delta L1", y_test_d, pred_y1_d, clf1_d, x_train_d)
+    print_performance("Delta L2", y_test_d, pred_y2_d, clf2_d, x_train_d)
