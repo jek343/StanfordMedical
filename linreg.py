@@ -10,7 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-DATA_YEAR = 2018
+DATA_YEAR = 2019
 PREDICT_YEAR = 2019
 
 predict = "Premature age-adjusted mortality raw value"
@@ -214,15 +214,20 @@ def deltas(prev_year, curr_year):
 
     prev_y = prev_year[predict]
     curr_y = curr_year[predict]
+    curr_y /= np.max(curr_y, axis=0)
     prev_year.drop(columns=[predict], inplace = True)
     curr_year.drop(columns=[predict], inplace = True)
     delta = curr_year - prev_year
+    delta = pd.concat([delta, prev_y], axis=1)
     delta -= np.min(delta, axis=0)
     delta /= np.max(delta, axis=0)
     delta.dropna(axis='columns', how='all', inplace = True)
+    #maybe drop row instead of just filling
     delta.fillna(value=0.0, inplace=True)
-    delta_X = pd.concat([delta, prev_y], axis=1)
-    print(delta_X.head())
+    # print(delta.columns)
+    # print(len(delta.columns))
+    delta_X = delta
+    # print(delta_X.head())
     return delta_X, curr_y
 
 
@@ -380,7 +385,7 @@ elif coef=="brfs":
 clf = LinearRegression()
 clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
 clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
-clf_delta = LinearRegression()
+# clf_delta = LinearRegression()
 
 #fitting the models
 # clf = clf.fit(X_train, y_train)
@@ -389,7 +394,7 @@ clf_delta = LinearRegression()
 clf = clf.fit(x_train, y_train)
 clf1 = clf1.fit(x_train, y_train)
 clf2 = clf2.fit(x_train, y_train)
-clfdelta = clf_delta.fit(delta_X, curr_y)
+# clfdelta = clf_delta.fit(delta_X, curr_y)
 
 #predicting the outputs
 # pred_y = clf.predict(X_test)  # [:,0]
@@ -398,62 +403,32 @@ clfdelta = clf_delta.fit(delta_X, curr_y)
 pred_y = clf.predict(x_test)  # [:,0]
 pred_y1 = clf1.predict(x_test)
 pred_y2 = clf2.predict(x_test)
-pred_delta = clf_delta.predict(delta_X)
-print('r2 delta', r2_score(curr_y, pred_delta))
+# pred_delta = clf_delta.predict(delta_X)
+# print('r2 delta', r2_score(curr_y, pred_delta))
 
 #analyzing performance of models
-print('mean absolute error', mean_absolute_error(y_test, pred_y))
-print('r2', r2_score(y_test, pred_y))
-print("bias", clf.intercept_)
+def print_performance(title, actual, prediction, clf):
+    print("\n" + title)
+    print('mean absolute error', mean_absolute_error(actual, prediction))
+    print('r2', r2_score(actual, prediction))
+    print("bias", clf.intercept_)
 
-print('mean absolute error 1', mean_absolute_error(y_test, pred_y1))
-print('r2 1', r2_score(y_test, pred_y1))
-print("bias 1", clf1.intercept_)
-
-print('mean absolute error 2', mean_absolute_error(y_test, pred_y2))
-print('r2 2', r2_score(y_test, pred_y2))
-print("bias 2", clf2.intercept_)
-
-fig, ax = plt.subplots()
-ax.scatter(range(len(clf.coef_)), clf.coef_, s = 5)
-# print if weight >.1
-for i, txt in enumerate(clf.coef_):
-    if abs(txt) > 0.1:
-        ax.annotate(i, (i+0.5,txt), fontsize=7)
-        print(i, X_field_order[i], txt)
+    fig, ax = plt.subplots()
+    ax.scatter(range(len(clf.coef_)), clf.coef_, s = 5)
+    # print if weight >.1
+    for i, txt in enumerate(clf.coef_):
+        if abs(txt) > 0.05:
+            ax.annotate(i, (i+0.5,txt), fontsize=7)
+            print(i, x_train.columns[i], txt)
 
 
-plt.xlabel("Index of feature")
-plt.ylabel("Weight Value")
-plt.title("Unregularized Linear Regression Weight Value vs Index of feature")
-plt.legend(["R^2: " + str(round(r2_score(y_test, pred_y),2))], loc="lower right")
-plt.savefig('weights.png')
-plt.clf()
+    plt.xlabel("Index of feature")
+    plt.ylabel("Weight Value")
+    plt.title(title + " Linear Regression Weight Value vs Index of feature")
+    plt.legend(["R^2: " + str(round(r2_score(actual, prediction),2))], loc="lower right")
+    plt.savefig('weights.png')
+    plt.clf()
 
-fig, ax = plt.subplots()
-ax.scatter(range(len(clf1.coef_)),clf1.coef_, s = 5, color="orange")
-for i, txt in enumerate(clf1.coef_):
-    if abs(txt) > 0.1:
-        ax.annotate(i, (i+0.5,txt), fontsize=7)
-        print(i, X_field_order[i], txt)
-
-plt.xlabel("Index of feature")
-plt.ylabel("Weight Value")
-plt.title("L1 Linear Regression Weight Value vs Index of feature")
-plt.legend(["R^2: " + str(round(r2_score(y_test, pred_y1),2))], loc="lower right")
-plt.savefig('weights1.png')
-plt.clf()
-
-fig, ax = plt.subplots()
-ax.scatter(range(len(clf2.coef_)),clf2.coef_, s = 5, color="green")
-for i, txt in enumerate(clf2.coef_):
-    if abs(txt) > 0.1:
-        ax.annotate(i, (i+0.5,txt), fontsize=7)
-        print(i, X_field_order[i], txt)
-
-plt.legend(["R^2: " + str(round(r2_score(y_test, pred_y2),2))], loc="lower right")
-plt.xlabel("Index of feature")
-plt.ylabel("Weight Value")
-plt.title("L2 Linear Regression Weight Value vs Index of feature")
-plt.savefig('weights2.png')
-plt.clf()
+print_performance("Unregularized", y_test, pred_y, clf)
+print_performance("L1", y_test, pred_y1, clf1)
+print_performance("L2", y_test, pred_y2, clf2)
