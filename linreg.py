@@ -12,6 +12,7 @@ import seaborn as sns
 
 DATA_YEAR = 2018
 PREDICT_YEAR = 2019
+DELTA = True
 
 create_map = True
 
@@ -56,17 +57,16 @@ include_features_brfs = [predict,
                     "Social associations raw value", "% Missing entries"]
 
 def open_csv(path):
+    '''Returns the csv reader for the file at the specified path'''
     data_csv_file = open(path)
     return csv.reader(data_csv_file, delimiter=',')
 
 
-DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
-P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
-
-prev_year = pd.read_csv(DATA_PATH)
-curr_year = pd.read_csv(P_DATA_PATH)
-
 def remove_rows_cols(data):
+    '''Renames row indexes to fips code unique identifier, drops counties that
+    do not report mortality then drops rows and columns with empty cells,
+    non-numeric columns, numerators, denominators, confidence intervals,
+    county ranked, state abbreviation, name, and obviously related features'''
     #rename row indexes to fips code
     data.rename(index = dict(zip(data.index, data['5-digit FIPS Code'])), inplace = True)
     #drop rows that do not have mortality
@@ -83,11 +83,10 @@ def remove_rows_cols(data):
     data.drop(columns=list(cols_to_remove), inplace = True)
     return data
 
-curr_year = remove_rows_cols(curr_year)
-prev_year = remove_rows_cols(prev_year)
 
 def data_both_years(prev_year, curr_year):
-    '''Keeps county info (rows) that are in both years' datasets using 5-digit FIPS code as unique identifier'''
+    '''Keeps county info (rows) that are in both years' datasets using 5-digit
+    FIPS code as unique identifier'''
     #only keep counties that are in both years
     curr_rows = set(curr_year.index)
     prev_rows = set(prev_year.index)
@@ -107,7 +106,6 @@ def data_both_years(prev_year, curr_year):
     curr_year.drop(columns=list(drop_curr), inplace = True)
     return prev_year, curr_year
 
-prev_year, curr_year = data_both_years(prev_year, curr_year)
 
 def get_x(year):
     '''Gets all the normalized "x" data (socioeconomic & demographic, not the mortality) for year
@@ -117,6 +115,7 @@ def get_x(year):
     x /= np.max(x, axis=0)
     return x
 
+
 def get_y(year):
     '''Gets the normalized mortality for the given year
     Note: columns are still labeled with FIPS'''
@@ -125,11 +124,11 @@ def get_y(year):
     y /= np.max(y, axis=0)
     return y
 
-prev_x = get_x(prev_year)
-curr_y = get_y(curr_year)
-x_train, x_test, y_train, y_test = train_test_split(prev_x, curr_y, test_size=0.2, random_state=0)
 
 def deltas(prev_year, curr_year):
+    '''Returns the normalized deltas between curr_year and prev_year socioeconomic &
+    demographic data concatenated with prev_year mortality to be used as the
+    x dataset and the normalized curr_year mortality to be used as the y dataset'''
     prev_y = prev_year[predict]
     curr_y = curr_year[predict]
     curr_y -= np.min(curr_y, axis=0)
@@ -145,27 +144,32 @@ def deltas(prev_year, curr_year):
     delta_X = delta
     return delta_X, curr_y
 
+def model(x_train, y_train, x_test, delta):
+    '''Evaluates linear regression for unregularized, lasso, and ridge regression.
+    Calls print_performance to print out each model's performance.'''
+    #creating the models
+    clf = LinearRegression()
+    clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
+    clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
 
-delta_X, delta_Y = deltas(prev_year, curr_year)
-x_train_d, x_test_d, y_train_d, y_test_d= train_test_split(delta_X, delta_Y, test_size=0.2, random_state=0)
+    #fitting the models
+    clf = clf.fit(x_train, y_train)
+    clf1 = clf1.fit(x_train, y_train)
+    clf2 = clf2.fit(x_train, y_train)
 
-#creating the models
-clf = LinearRegression()
-clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
-clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
+    #predicting the outputs
+    pred_y = clf.predict(x_test)
+    pred_y1 = clf1.predict(x_test)
+    pred_y2 = clf2.predict(x_test)
 
-#fitting the models
-clf = clf.fit(x_train, y_train)
-clf1 = clf1.fit(x_train, y_train)
-clf2 = clf2.fit(x_train, y_train)
-
-#predicting the outputs
-pred_y = clf.predict(x_test)
-pred_y1 = clf1.predict(x_test)
-pred_y2 = clf2.predict(x_test)
+    print_performance("Unregularized", y_test, pred_y, clf, x_train, delta)
+    print_performance("L1", y_test, pred_y1, clf1, x_train, delta)
+    print_performance("L2", y_test, pred_y2, clf2, x_train, delta)
 
 #analyzing performance of models
-def print_performance(title, actual, prediction, clf, train):
+def print_performance(title, actual, prediction, clf, train, delta):
+    '''Prints the R^2, MAE, bias, and largest weights (absolute value).
+    Saves a scatter plot of the weights'''
     print("\n" + title)
     print('mean absolute error', mean_absolute_error(actual, prediction))
     print('r2', r2_score(actual, prediction))
@@ -179,38 +183,47 @@ def print_performance(title, actual, prediction, clf, train):
             ax.annotate(i, (i+0.5,txt), fontsize=7)
             print(i, train.columns[i], txt)
 
-
     plt.xlabel("Index of feature")
     plt.ylabel("Weight Value")
-    plt.title(title + " Linear Regression Weight Value vs Index of feature")
+    d = ""
+    if delta:
+        d = "Delta "
+    plt.title(d + title + " Linear Regression Weight Value vs Index of feature")
     plt.legend(["R^2: " + str(round(r2_score(actual, prediction),2))], loc="lower right")
-    plt.savefig('weights.png')
+    plt.savefig(d + title + 'weights.png')
     plt.clf()
 
-print_performance("Unregularized", y_test, pred_y, clf, x_train)
-print_performance("L1", y_test, pred_y1, clf1, x_train)
-print_performance("L2", y_test, pred_y2, clf2, x_train)
 
-if PREDICT_YEAR != DATA_YEAR:
-    clf_d = LinearRegression()
-    clf1_d = Lasso(alpha=0.0001, fit_intercept=True)  # l1
-    clf2_d = Ridge(alpha=0.1, fit_intercept=True)  # l2
 
-    clf_d = clf_d.fit(x_train_d, y_train_d)
-    clf1_d = clf1_d.fit(x_train_d, y_train_d)
-    clf2_d = clf2_d.fit(x_train_d, y_train_d)
 
-    pred_y_d = clf_d.predict(x_test_d)
-    pred_y1_d = clf1_d.predict(x_test_d)
-    pred_y2_d = clf2_d.predict(x_test_d)
+DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
+P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
 
-    print_performance("Delta Unregularized", y_test_d, pred_y_d, clf_d, x_train_d)
-    print_performance("Delta L1", y_test_d, pred_y1_d, clf1_d, x_train_d)
-    print_performance("Delta L2", y_test_d, pred_y2_d, clf2_d, x_train_d)
+prev_year = pd.read_csv(DATA_PATH)
+curr_year = pd.read_csv(P_DATA_PATH)
+
+curr_year = remove_rows_cols(curr_year)
+prev_year = remove_rows_cols(prev_year)
+
+prev_year, curr_year = data_both_years(prev_year, curr_year)
+
+prev_x = get_x(prev_year)
+curr_y = get_y(curr_year)
+x_train, x_test, y_train, y_test = train_test_split(prev_x, curr_y, test_size=0.2, random_state=0)
+
+model(x_train, y_train, x_test, False)
+
+if DELTA and PREDICT_YEAR != DATA_YEAR:
+    delta_X, delta_Y = deltas(prev_year, curr_year)
+    x_train_d, x_test_d, y_train_d, y_test_d = train_test_split(delta_X, delta_Y, test_size=0.2, random_state=0)
+
+    print("\nDELTA RESULTS")
+    model(x_train_d, y_train_d, x_test_d, True)
 
 
 def create_coef_map():
-    '''Creates a figure that shows the correlation coefficients between all the features and the feature being predicted'''
+    '''Creates a figure that shows the correlation coefficients between all the
+    features and the feature being predicted'''
     xy = pd.concat([prev_x, curr_y], axis=1)
     cols = list(xy.columns)
     stdsc = StandardScaler()
@@ -223,23 +236,14 @@ def create_coef_map():
     cov_mat_row = cov_mat_row[indexes]
     fig, (ax,ax2) = plt.subplots(ncols=2, figsize=(10, 5))
     fig.subplots_adjust(wspace=0.01)
-    sns.heatmap(np.expand_dims(cov_mat_row[:mid], axis=1),
-                    ax = ax,
-                     cbar=False,
-                     annot=True,
-                     fmt='.2f',
-                     cmap='Reds',
-                     yticklabels=[x[:-10] for x in cols[:mid]],
-                     xticklabels=False)
+    sns.heatmap(np.expand_dims(cov_mat_row[:mid], axis=1), ax = ax,
+                cbar=False, annot=True, fmt='.2f', cmap='Reds',
+                yticklabels=[x[:-10] for x in cols[:mid]],
+                xticklabels=False)
     sns.heatmap(np.expand_dims(cov_mat_row[mid:], axis=1),
-                    ax = ax2,
-                     cbar=False,
-                     annot=True,
-                     fmt='.2f',
-                     cmap='Blues',
-                     yticklabels=[x[:-10] for x in cols[mid:]],
-                     xticklabels=False)
-
+                ax = ax2, cbar=False, annot=True, fmt='.2f', cmap='Blues',
+                yticklabels=[x[:-10] for x in cols[mid:]],
+                xticklabels=False)
     ax2.yaxis.tick_right()
     ax2.tick_params(rotation=0)
     fig.suptitle('Correlation coefficients between features and ' + predict[:-10])#, size = title_size)
