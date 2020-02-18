@@ -13,6 +13,8 @@ import seaborn as sns
 DATA_YEAR = 2018
 PREDICT_YEAR = 2019
 
+create_map = True
+
 predict = "Premature age-adjusted mortality raw value"
 
 possible_y = ["Premature death raw value", "Life expectancy raw value",
@@ -50,10 +52,6 @@ include_features_brfs = [predict,
                     "Insufficient sleep raw value",
                     "Social associations raw value", "% Missing entries"]
 
-#if fields is [], will use all the usable & not obviously correlated features
-fields = []
-coef = "all"
-
 def open_csv(path):
     data_csv_file = open(path)
     return csv.reader(data_csv_file, delimiter=',')
@@ -62,7 +60,6 @@ def open_csv(path):
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
 P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
 
-#---------------------new code
 prev_year = pd.read_csv(DATA_PATH)
 curr_year = pd.read_csv(P_DATA_PATH)
 
@@ -141,70 +138,13 @@ def deltas(prev_year, curr_year):
     delta -= np.min(delta, axis=0)
     delta /= np.max(delta, axis=0)
     delta.dropna(axis='columns', how='all', inplace = True)
-    #maybe drop row instead of just filling
     delta.fillna(value=0.0, inplace=True)
-    # print(delta.columns)
-    # print(len(delta.columns))
     delta_X = delta
-    # print(delta_X.head())
     return delta_X, curr_y
 
 
 delta_X, delta_Y = deltas(prev_year, curr_year)
 x_train_d, x_test_d, y_train_d, y_test_d= train_test_split(delta_X, delta_Y, test_size=0.2, random_state=0)
-
-# calculate correlation between X and y and print in decreasing magnitude
-def corr_coef_Xy_dec_mag(Xy):
-    correlation = Xy.corr()[y.columns[0]][:]
-    order = correlation.map(lambda x : abs(x)).sort_values(ascending = False)
-    #printing the correlation coefficient matrix
-    for i in order.index.values[1:]:
-        print(X_field_order.index(i), i, correlation[i])
-    #create bar graph of coefficients
-    plt.bar(range(len(clf1.coef_)), correlation[:-1])
-    plt.xlabel("Index of feature")
-    plt.ylabel("Correlation between feature and mortality")
-    plt.title("Correlation between feature and mortality vs Index of feature")
-    plt.savefig("corr.png")
-    plt.clf()
-
-def create_coef_map(shrink, filename, label_font_size, coef_font_size, fig_size, title_size):
-    cols = list(Xy.columns)
-    stdsc = StandardScaler()
-    X_std = stdsc.fit_transform(Xy[cols].iloc[:,range(len(cols))].values)
-    cov_mat =np.cov(X_std.T)
-    plt.figure(figsize=(fig_size,fig_size))
-    sns.set(font_scale=label_font_size)
-    hm = sns.heatmap(cov_mat,
-                     cbar=True,
-                     cbar_kws={"shrink": shrink},
-                     annot=True,
-                     square=True,
-                     fmt='.2f',
-                     annot_kws={'size': coef_font_size},
-                     cmap='coolwarm',
-                     yticklabels=[x[:-10] for x in cols],
-                     xticklabels=[x[:-10] for x in cols])
-    plt.title('Covariance matrix showing correlation coefficients', size = title_size)
-    plt.tight_layout()
-    plt.savefig(filename + ".png")
-    plt.cla()
-    g = sns.pairplot(Xy[cols], size=2.0)
-    g.set(xticklabels=[], yticklabels = [])
-    plt.savefig(filename + "_pair.png")
-    plt.cla()
-
-brfs = {"shrink":0.71, "filename": "coef_brfs", "label_font_size":1.5, "coef_font_size": 12, "fig_size":10, "title_size":18}
-paper = {"shrink":0.82, "filename": "coef_paper", "label_font_size":0.95, "coef_font_size": 8, "fig_size":10, "title_size":18}
-all = {"shrink":0.82, "filename": "coef_all", "label_font_size":1.0, "coef_font_size": 10, "fig_size":30, "title_size":30}
-
-dict = all
-if coef=="paper":
-    dict = paper
-elif coef=="brfs":
-    dict = brfs
-
-# create_coef_map(dict["shrink"], dict["filename"], dict["label_font_size"], dict["coef_font_size"], dict["fig_size"], dict["title_size"])
 
 #creating the models
 clf = LinearRegression()
@@ -230,7 +170,7 @@ def print_performance(title, actual, prediction, clf, train):
 
     fig, ax = plt.subplots()
     ax.scatter(range(len(clf.coef_)), clf.coef_, s = 5)
-    # print if weight >.1
+    # print if weight >.05
     for i, txt in enumerate(clf.coef_):
         if abs(txt) > 0.05:
             ax.annotate(i, (i+0.5,txt), fontsize=7)
@@ -264,3 +204,46 @@ if PREDICT_YEAR != DATA_YEAR:
     print_performance("Delta Unregularized", y_test_d, pred_y_d, clf_d, x_train_d)
     print_performance("Delta L1", y_test_d, pred_y1_d, clf1_d, x_train_d)
     print_performance("Delta L2", y_test_d, pred_y2_d, clf2_d, x_train_d)
+
+
+def create_coef_map():
+    '''Creates a figure that shows the correlation coefficients between all the features and the feature being predicted'''
+    xy = pd.concat([prev_x, curr_y], axis=1)
+    cols = list(xy.columns)
+    stdsc = StandardScaler()
+    X_std = stdsc.fit_transform(xy.to_numpy())
+    cov_mat =np.cov(X_std.T)
+    cov_mat_row = cov_mat[:,-1]
+    indexes = np.argsort(-cov_mat_row)
+    mid = int(len(indexes) / 2)
+    cols = np.array(cols)[indexes]
+    cov_mat_row = cov_mat_row[indexes]
+    fig, (ax,ax2) = plt.subplots(ncols=2, figsize=(10, 5))
+    fig.subplots_adjust(wspace=0.01)
+    sns.heatmap(np.expand_dims(cov_mat_row[:mid], axis=1),
+                    ax = ax,
+                     cbar=False,
+                     annot=True,
+                     fmt='.2f',
+                     cmap='Reds',
+                     yticklabels=[x[:-10] for x in cols[:mid]],
+                     xticklabels=False)
+    sns.heatmap(np.expand_dims(cov_mat_row[mid:], axis=1),
+                    ax = ax2,
+                     cbar=False,
+                     annot=True,
+                     fmt='.2f',
+                     cmap='Blues',
+                     yticklabels=[x[:-10] for x in cols[mid:]],
+                     xticklabels=False)
+
+    ax2.yaxis.tick_right()
+    ax2.tick_params(rotation=0)
+    fig.suptitle('Correlation coefficients between features and ' + predict[:-10])#, size = title_size)
+    fig.canvas.draw()
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.savefig("coef.png")
+    plt.cla()
+
+if create_map:
+    create_coef_map()
