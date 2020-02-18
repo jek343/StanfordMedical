@@ -1,8 +1,8 @@
 import csv
 import os
 from sklearn import preprocessing
-from sklearn.linear_model import LinearRegression, Ridge, Lasso
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, RidgeCV,  LassoCV
+from sklearn.model_selection import train_test_split, cross_val_score, cross_validate
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
 import numpy as np
@@ -12,8 +12,8 @@ import seaborn as sns
 
 DATA_YEAR = 2018
 PREDICT_YEAR = 2019
-DELTA = False
-CV = False
+DELTA = True
+CV = True
 
 create_map = True
 
@@ -148,19 +148,24 @@ def deltas(prev_year, curr_year):
 def model(x, y, delta):
     '''Evaluates linear regression for unregularized, lasso, and ridge regression.
     Calls print_performance to print out each model's performance.'''
-    #creating the models
     clf = LinearRegression()
     clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
     clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
 
     if CV:
-        scores = cross_val_score(clf, x, y, cv=5)
-        scores1 = cross_val_score(clf1, x, y, cv=5)
-        scores2 = cross_val_score(clf2, x, y, cv=5)
+        cv_results = cross_validate(clf, x, y, cv=5, return_estimator = True)
+        cv_results1 = cross_validate(clf1, x, y, cv=5, return_estimator = True)
+        cv_results2 = cross_validate(clf2, x, y, cv=5, return_estimator = True)
 
-        print("Accuracy: %0.5f (+/- %0.5f)" % (scores.mean(), scores.std() * 2))
-        print("Accuracy 1: %0.5f (+/- %0.5f)" % (scores1.mean(), scores1.std() * 2))
-        print("Accuracy 1: %0.5f (+/- %0.5f)" % (scores2.mean(), scores2.std() * 2))
+        scores = cv_results['test_score']
+        scores1 = cv_results1['test_score']
+        scores2 = cv_results2['test_score']
+
+        print("\nCROSS VALIDATION RESULTS")
+        print_performance_cv("Unregularized", scores, cv_results, x.columns)
+        print_performance_cv("L1", scores1, cv_results1, x.columns)
+        print_performance_cv("L2", scores2, cv_results2, x.columns)
+
     else:
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
 
@@ -178,9 +183,30 @@ def model(x, y, delta):
         print_performance("L1", y_test, pred_y1, clf1, x_train, delta)
         print_performance("L2", y_test, pred_y2, clf2, x_train, delta)
 
+
+def print_performance_cv(title, scores, cv_results, cols):
+    '''When cross validation is used.
+    Prints the R^2 and largest weights (absolute value).'''
+    print("\n" + title)
+    print("R^2: %0.5f (+/- %0.5f)" % (scores.mean(), scores.std() * 2))
+    d = {}
+    for fold in cv_results['estimator']:
+        for i, txt in enumerate(fold.coef_):
+            if abs(txt) > 0.05:
+                if cols[i] in d:
+                    d[cols[i]].append(txt)
+                else:
+                    d[cols[i]] = [txt]
+
+    for key, lst in d.items():
+        if len(lst) >= 3:
+            print(key + " : %0.5f (+/- %0.5f)" % (np.mean(lst), np.std(lst) * 2))
+
+
 #analyzing performance of models
 def print_performance(title, actual, prediction, clf, train, delta):
-    '''Prints the R^2, MAE, bias, and largest weights (absolute value).
+    '''When cross validation is not used.
+    Prints the R^2, MAE, bias, and largest weights (absolute value).
     Saves a scatter plot of the weights'''
     print("\n" + title)
     print('Mean absolute error', mean_absolute_error(actual, prediction))
@@ -193,7 +219,7 @@ def print_performance(title, actual, prediction, clf, train, delta):
     for i, txt in enumerate(clf.coef_):
         if abs(txt) > 0.05:
             ax.annotate(i, (i+0.5,txt), fontsize=7)
-            print(i, train.columns[i], txt)
+            print(train.columns[i], ":", round(txt, 5))
 
     plt.xlabel("Index of feature")
     plt.ylabel("Weight Value")
