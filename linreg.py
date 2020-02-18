@@ -246,7 +246,7 @@ def create_coef_map():
                 xticklabels=False)
     ax2.yaxis.tick_right()
     ax2.tick_params(rotation=0)
-    fig.suptitle('Correlation coefficients between features and ' + predict[:-10])#, size = title_size)
+    fig.suptitle('Correlation coefficients between features and ' + predict[:-10])
     fig.canvas.draw()
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.savefig("coef.png")
