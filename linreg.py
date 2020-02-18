@@ -2,7 +2,7 @@ import csv
 import os
 from sklearn import preprocessing
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
 import numpy as np
@@ -12,7 +12,8 @@ import seaborn as sns
 
 DATA_YEAR = 2018
 PREDICT_YEAR = 2019
-DELTA = True
+DELTA = False
+CV = False
 
 create_map = True
 
@@ -144,7 +145,7 @@ def deltas(prev_year, curr_year):
     delta_X = delta
     return delta_X, curr_y
 
-def model(x_train, y_train, x_test, delta):
+def model(x, y, delta):
     '''Evaluates linear regression for unregularized, lasso, and ridge regression.
     Calls print_performance to print out each model's performance.'''
     #creating the models
@@ -152,28 +153,39 @@ def model(x_train, y_train, x_test, delta):
     clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
     clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
 
-    #fitting the models
-    clf = clf.fit(x_train, y_train)
-    clf1 = clf1.fit(x_train, y_train)
-    clf2 = clf2.fit(x_train, y_train)
+    if CV:
+        scores = cross_val_score(clf, x, y, cv=5)
+        scores1 = cross_val_score(clf1, x, y, cv=5)
+        scores2 = cross_val_score(clf2, x, y, cv=5)
 
-    #predicting the outputs
-    pred_y = clf.predict(x_test)
-    pred_y1 = clf1.predict(x_test)
-    pred_y2 = clf2.predict(x_test)
+        print("Accuracy: %0.5f (+/- %0.5f)" % (scores.mean(), scores.std() * 2))
+        print("Accuracy 1: %0.5f (+/- %0.5f)" % (scores1.mean(), scores1.std() * 2))
+        print("Accuracy 1: %0.5f (+/- %0.5f)" % (scores2.mean(), scores2.std() * 2))
+    else:
+        x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
 
-    print_performance("Unregularized", y_test, pred_y, clf, x_train, delta)
-    print_performance("L1", y_test, pred_y1, clf1, x_train, delta)
-    print_performance("L2", y_test, pred_y2, clf2, x_train, delta)
+        #fitting the models
+        clf = clf.fit(x_train, y_train)
+        clf1 = clf1.fit(x_train, y_train)
+        clf2 = clf2.fit(x_train, y_train)
+
+        #predicting the outputs
+        pred_y = clf.predict(x_test)
+        pred_y1 = clf1.predict(x_test)
+        pred_y2 = clf2.predict(x_test)
+
+        print_performance("Unregularized", y_test, pred_y, clf, x_train, delta)
+        print_performance("L1", y_test, pred_y1, clf1, x_train, delta)
+        print_performance("L2", y_test, pred_y2, clf2, x_train, delta)
 
 #analyzing performance of models
 def print_performance(title, actual, prediction, clf, train, delta):
     '''Prints the R^2, MAE, bias, and largest weights (absolute value).
     Saves a scatter plot of the weights'''
     print("\n" + title)
-    print('mean absolute error', mean_absolute_error(actual, prediction))
-    print('r2', r2_score(actual, prediction))
-    print("bias", clf.intercept_)
+    print('Mean absolute error', mean_absolute_error(actual, prediction))
+    print('R^2', r2_score(actual, prediction))
+    print("Bias", clf.intercept_)
 
     fig, ax = plt.subplots()
     ax.scatter(range(len(clf.coef_)), clf.coef_, s = 5)
@@ -209,16 +221,14 @@ prev_year, curr_year = data_both_years(prev_year, curr_year)
 
 prev_x = get_x(prev_year)
 curr_y = get_y(curr_year)
-x_train, x_test, y_train, y_test = train_test_split(prev_x, curr_y, test_size=0.2, random_state=0)
 
-model(x_train, y_train, x_test, False)
+model(prev_x, curr_y, False)
 
 if DELTA and PREDICT_YEAR != DATA_YEAR:
     delta_X, delta_Y = deltas(prev_year, curr_year)
-    x_train_d, x_test_d, y_train_d, y_test_d = train_test_split(delta_X, delta_Y, test_size=0.2, random_state=0)
 
     print("\nDELTA RESULTS")
-    model(x_train_d, y_train_d, x_test_d, True)
+    model(delta_X, delta_Y, True)
 
 
 def create_coef_map():
