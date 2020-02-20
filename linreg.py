@@ -14,8 +14,9 @@ import seaborn as sns
 
 DATA_YEAR = 2018
 PREDICT_YEAR = 2019
-DELTA = True
-CV = True
+X_DELTA = True
+XY_DELTA = True
+CV = False
 
 create_map = True
 
@@ -128,7 +129,7 @@ def get_y(year):
     return y
 
 
-def deltas(prev_year, curr_year):
+def x_deltas(prev_year, curr_year):
     '''Returns the normalized deltas between curr_year and prev_year socioeconomic &
     demographic data concatenated with prev_year mortality to be used as the
     x dataset and the normalized curr_year mortality to be used as the y dataset'''
@@ -136,18 +137,32 @@ def deltas(prev_year, curr_year):
     curr_y = curr_year[predict]
     curr_y -= np.min(curr_y, axis=0)
     curr_y /= np.max(curr_y, axis=0)
-    prev_year.drop(columns=[predict], inplace = True)
-    curr_year.drop(columns=[predict], inplace = True)
-    delta = curr_year - prev_year
-    delta = pd.concat([delta, prev_y], axis=1)
-    delta -= np.min(delta, axis=0)
-    delta /= np.max(delta, axis=0)
-    delta.dropna(axis='columns', how='all', inplace = True)
-    delta.fillna(value=0.0, inplace=True)
-    delta_X = delta
-    return delta_X, curr_y
+    p_year = prev_year.drop(columns=[predict])
+    c_year = curr_year.drop(columns=[predict])
+    x = c_year - p_year
+    x = pd.concat([x, prev_y], axis=1)
+    x -= np.min(x, axis=0)
+    x /= np.max(x, axis=0)
+    x.dropna(axis='columns', how='all', inplace = True)
+    x.fillna(value=0.0, inplace=True)
+    return x, curr_y
 
-def model(x, y, delta):
+def xy_deltas(prev_year, curr_year):
+    prev_y = prev_year[predict]
+    curr_y = curr_year[predict]
+    y = curr_y - prev_y
+    y -= np.min(y, axis=0)
+    y /= np.max(y, axis=0)
+    p_year = prev_year.drop(columns=[predict])
+    c_year = curr_year.drop(columns=[predict])
+    x = c_year - p_year
+    x -= np.min(x, axis=0)
+    x /= np.max(x, axis=0)
+    x.dropna(axis='columns', how='all', inplace = True)
+    x.fillna(value=0.0, inplace=True)
+    return x, y
+
+def model(x, y, x_delta, xy_delta):
     '''Evaluates linear regression for unregularized, lasso, and ridge regression.
     Calls print_performance to print out each model's performance.'''
     clf = LinearRegression()
@@ -197,9 +212,9 @@ def model(x, y, delta):
         pred_y3 = regr.predict(x_test)
         pred_y4 = gb_regr.predict(x_test)
 
-        print_performance("Unregularized", y_test, pred_y, clf, x_train, delta)
-        print_performance("L1", y_test, pred_y1, clf1, x_train, delta)
-        print_performance("L2", y_test, pred_y2, clf2, x_train, delta)
+        print_performance("Unregularized", y_test, pred_y, clf, x_train, x_delta, xy_delta)
+        print_performance("L1", y_test, pred_y1, clf1, x_train, x_delta, xy_delta)
+        print_performance("L2", y_test, pred_y2, clf2, x_train, x_delta, xy_delta)
         print("\nRandom Forest", regr.score(x_test, y_test))
         print("\nGradient Boosted Random Forest", gb_regr.score(x_test, y_test))
 
@@ -224,7 +239,7 @@ def print_performance_cv(title, scores, cv_results, cols):
 
 
 #analyzing performance of models
-def print_performance(title, actual, prediction, clf, train, delta):
+def print_performance(title, actual, prediction, clf, train, x_delta, xy_delta):
     '''When cross validation is not used.
     Prints the R^2, MAE, bias, and largest weights (absolute value).
     Saves a scatter plot of the weights'''
@@ -244,8 +259,10 @@ def print_performance(title, actual, prediction, clf, train, delta):
     plt.xlabel("Index of feature")
     plt.ylabel("Weight Value")
     d = ""
-    if delta:
-        d = "Delta "
+    if x_delta:
+        d = "XDelta "
+    elif xy_delta:
+        d = "XYDelta "
     plt.title(d + title + " Linear Regression Weight Value vs Index of feature")
     plt.legend(["R^2: " + str(round(r2_score(actual, prediction),2))], loc="lower right")
     plt.savefig(d + title + 'weights.png')
@@ -268,13 +285,19 @@ prev_year, curr_year = data_both_years(prev_year, curr_year)
 prev_x = get_x(prev_year)
 curr_y = get_y(curr_year)
 
-model(prev_x, curr_y, False)
+model(prev_x, curr_y, False, False)
 
-if DELTA and PREDICT_YEAR != DATA_YEAR:
-    delta_X, delta_Y = deltas(prev_year, curr_year)
+if X_DELTA and PREDICT_YEAR != DATA_YEAR:
+    delta_X, delta_Y = x_deltas(prev_year, curr_year)
 
-    print("\nDELTA RESULTS")
-    model(delta_X, delta_Y, True)
+    print("\nX DELTA RESULTS")
+    model(delta_X, delta_Y, True, False)
+
+if XY_DELTA and PREDICT_YEAR != DATA_YEAR:
+    xydelta_x, xydelta_y = xy_deltas(prev_year, curr_year)
+
+    print("\nXY DELTA RESULTS")
+    model(xydelta_x, xydelta_y, False, True)
 
 def create_coef_map():
     '''Creates a figure that shows the correlation coefficients between all the
