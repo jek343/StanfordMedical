@@ -171,7 +171,7 @@ def model(x, y, delta):
     else:
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
 
-        regr = RandomForestRegressor(max_depth=2, random_state=0)
+        regr = RandomForestRegressor(random_state=0)
 
         #fitting the models
         clf = clf.fit(x_train, y_train)
