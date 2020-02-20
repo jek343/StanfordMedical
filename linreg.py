@@ -2,6 +2,8 @@ import csv
 import os
 from sklearn import preprocessing
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, RidgeCV,  LassoCV
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.datasets import make_regression
 from sklearn.model_selection import train_test_split, cross_val_score, cross_validate
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
@@ -13,7 +15,7 @@ import seaborn as sns
 DATA_YEAR = 2018
 PREDICT_YEAR = 2019
 DELTA = True
-CV = True
+CV = False
 
 create_map = True
 
@@ -169,19 +171,24 @@ def model(x, y, delta):
     else:
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
 
+        regr = RandomForestRegressor(max_depth=2, random_state=0)
+
         #fitting the models
         clf = clf.fit(x_train, y_train)
         clf1 = clf1.fit(x_train, y_train)
         clf2 = clf2.fit(x_train, y_train)
+        clf3 = regr.fit(x_train, y_train)
 
         #predicting the outputs
         pred_y = clf.predict(x_test)
         pred_y1 = clf1.predict(x_test)
         pred_y2 = clf2.predict(x_test)
+        pred_y3 = regr.predict(x_test)
 
         print_performance("Unregularized", y_test, pred_y, clf, x_train, delta)
         print_performance("L1", y_test, pred_y1, clf1, x_train, delta)
         print_performance("L2", y_test, pred_y2, clf2, x_train, delta)
+        print("Random Forest", regr.score(x_test, y_test))
 
 
 def print_performance_cv(title, scores, cv_results, cols):
@@ -255,7 +262,6 @@ if DELTA and PREDICT_YEAR != DATA_YEAR:
 
     print("\nDELTA RESULTS")
     model(delta_X, delta_Y, True)
-
 
 def create_coef_map():
     '''Creates a figure that shows the correlation coefficients between all the
