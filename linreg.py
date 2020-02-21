@@ -148,6 +148,9 @@ def x_deltas(prev_year, curr_year):
     return x, curr_y
 
 def xy_deltas(prev_year, curr_year):
+    '''Returns the normalized deltas between curr_year and prev_year socioeconomic &
+    demographic data to be used as the x dataset and the deltas between curr_year
+    and prev_year mortality to be used as the y dataset'''
     prev_y = prev_year[predict]
     curr_y = curr_year[predict]
     y = curr_y - prev_y
