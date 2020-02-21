@@ -166,7 +166,8 @@ def xy_deltas(prev_year, curr_year):
     return x, y
 
 def model(x, y, x_delta, xy_delta):
-    '''Evaluates linear regression for unregularized, lasso, and ridge regression.
+    '''Evaluates linear regression, random forest, and gradient boosted random
+    forest for unregularized, lasso, and ridge regression.
     Calls print_performance to print out each model's performance.'''
     clf = LinearRegression()
     clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
