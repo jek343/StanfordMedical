@@ -1,5 +1,6 @@
 import csv
 import os
+import sys
 from sklearn import preprocessing
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, RidgeCV,  LassoCV
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
@@ -18,7 +19,7 @@ X_DELTA = True
 XY_DELTA = True
 CV = False
 
-create_map = True
+create_map = False
 
 predict = "Premature age-adjusted mortality raw value"
 
@@ -172,7 +173,7 @@ def model(x, y, x_delta, xy_delta):
     clf = LinearRegression()
     clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
     clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
-
+    print(CV)
     if CV:
         cv_results = cross_validate(clf, x, y, cv=5, return_estimator = True)
         cv_results1 = cross_validate(clf1, x, y, cv=5, return_estimator = True)
@@ -196,6 +197,7 @@ def model(x, y, x_delta, xy_delta):
         gb_regr_scores = cross_val_score(gb_regr, x, y, cv=kfold)
         print("\nGradient Boosted Random Forest: %0.5f (+/- %0.5f)" % (gb_regr_scores.mean(), gb_regr_scores.std() * 2))
 
+        return scores1.mean(), scores1.std() * 2
     else:
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
 
@@ -221,7 +223,7 @@ def model(x, y, x_delta, xy_delta):
         print_performance("L2", y_test, pred_y2, clf2, x_train, x_delta, xy_delta)
         print("\nRandom Forest", regr.score(x_test, y_test))
         print("\nGradient Boosted Random Forest", gb_regr.score(x_test, y_test))
-
+    return None
 
 def print_performance_cv(title, scores, cv_results, cols):
     '''When cross validation is used.
@@ -303,6 +305,15 @@ if XY_DELTA and PREDICT_YEAR != DATA_YEAR:
     print("\nXY DELTA RESULTS")
     model(xydelta_x, xydelta_y, False, True)
 
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
 def create_coef_map():
     '''Creates a figure that shows the correlation coefficients between all the
     features and the feature being predicted'''
@@ -334,5 +345,80 @@ def create_coef_map():
     plt.savefig("coef.png")
     plt.cla()
 
+def map_xdeltas():
+    '''Creates a heatmap of the improvement of using x_deltas compared to get_x
+    and get_y for predict for L1 linear regression'''
+    global CV
+    CV = True
+    DATA_YEARS = [2013, 2014, 2015, 2016, 2017, 2018]
+    PREDICT_YEARS = [2019, 2018, 2017, 2016, 2015, 2014]
+    diff = np.zeros((6,6))
+    mask = np.zeros_like(diff)
+
+    for p_i, pred_yr in enumerate(PREDICT_YEARS):
+        for d_i, data_yr in enumerate(DATA_YEARS):
+            if data_yr < pred_yr:
+                DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(data_yr) + '.csv')
+                P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(pred_yr) + '.csv')
+                prev_year = pd.read_csv(DATA_PATH)
+                curr_year = pd.read_csv(P_DATA_PATH)
+                curr_year = remove_rows_cols(curr_year)
+                prev_year = remove_rows_cols(prev_year)
+                prev_year, curr_year = data_both_years(prev_year, curr_year)
+                prev_x = get_x(prev_year)
+                curr_y = get_y(curr_year)
+                blockPrint()
+                mean_xy, std2_xy = model(prev_x, curr_y, False, False)
+                enablePrint()
+                delta_X, delta_Y = x_deltas(prev_year, curr_year)
+                blockPrint()
+                mean_xdel, std2_xdel = model(delta_X, delta_Y, True, False)
+                enablePrint()
+                diff[p_i, d_i] = mean_xdel - mean_xy
+
+    mask[np.where(diff == 0)] = True #returns lower triangle
+    with sns.axes_style("white"):
+        f, ax = plt.subplots(figsize=(7, 5))
+        ax = sns.heatmap(diff, mask=mask, annot=True, xticklabels=[str(x) for x in DATA_YEARS],
+            yticklabels=[str(x) for x in PREDICT_YEARS], fmt="+.3f", cmap = "Greens", vmax=.3, square=True)
+    ax.tick_params(rotation=0)
+    plt.title("Improvement from x & y to x deltas & y")
+    plt.savefig("improve.png")
+    plt.cla()
+
+def map_xdeltas_r2():
+    global CV
+    CV = True
+    PREDICT_YEARS = [2019, 2018, 2017, 2016, 2015, 2014]
+    results = np.zeros((6,1))
+    for p_i, pred_yr in enumerate(PREDICT_YEARS):
+        data_yr = pred_yr - 1
+        DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(data_yr) + '.csv')
+        P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(pred_yr) + '.csv')
+        prev_year = pd.read_csv(DATA_PATH)
+        curr_year = pd.read_csv(P_DATA_PATH)
+        curr_year = remove_rows_cols(curr_year)
+        prev_year = remove_rows_cols(prev_year)
+        prev_year, curr_year = data_both_years(prev_year, curr_year)
+        delta_X, delta_Y = x_deltas(prev_year, curr_year)
+        prev_y = get_y(prev_year)
+        curr_y = get_y(curr_year)
+        blockPrint()
+        mean_xy, std2_xy = model(delta_X, curr_y, True, False)
+        enablePrint()
+        results[p_i] = mean_xy - r2_score(curr_y, prev_y)
+    fig, ax = plt.subplots(figsize=(5, 7))
+    ylabels = np.array([str(y) for y in PREDICT_YEARS])
+    ax = sns.heatmap(results, cbar=True, annot=True, fmt='+.3f', cmap='Greens',
+                yticklabels=ylabels, xticklabels=False)
+    ax.tick_params(rotation=0)
+    plt.title("Improvement from y r2 to x deltas & y")
+    plt.savefig("improve_r2.png")
+    plt.cla()
+
+
+
 if create_map:
     create_coef_map()
+    map_xdeltas()
+    map_xdeltas_r2()
