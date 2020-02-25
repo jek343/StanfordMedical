@@ -387,6 +387,9 @@ def map_xdeltas():
     plt.cla()
 
 def map_xdeltas_r2():
+    '''Creates a heatmap of the improvement of using x_deltas compared to
+    predicting the current year's mortality as the previous year's mortality
+    for predict for L1 linear regression'''
     global CV
     CV = True
     PREDICT_YEARS = [2019, 2018, 2017, 2016, 2015, 2014]
