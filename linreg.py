@@ -305,13 +305,13 @@ if XY_DELTA and PREDICT_YEAR != DATA_YEAR:
     print("\nXY DELTA RESULTS")
     model(xydelta_x, xydelta_y, False, True)
 
-
-# Disable
+#-------------------------VISUALIZATIONS----------------------------------------
 def blockPrint():
+    '''Blocks printing to the terminal'''
     sys.stdout = open(os.devnull, 'w')
 
-# Restore
 def enablePrint():
+    '''Restores printing to the terminal'''
     sys.stdout = sys.__stdout__
 
 def create_coef_map():
