@@ -1,6 +1,14 @@
 import csv
 import os
 import sys
+from xgboost import XGBRegressor
+
+'''
+Note: to install xgboost on mac
+git clone --recursive https://github.com/dmlc/xgboost
+cd xgboost; cp make/minimum.mk ./config.mk; make -j4
+cd python-package; python setup.py develop --user
+'''
 from sklearn import preprocessing
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, RidgeCV,  LassoCV
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
@@ -17,7 +25,7 @@ DATA_YEAR = 2018
 PREDICT_YEAR = 2019
 X_DELTA = True
 XY_DELTA = True
-CV = False
+CV = True
 
 create_map = False
 
@@ -173,7 +181,7 @@ def model(x, y, x_delta, xy_delta):
     clf = LinearRegression()
     clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
     clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
-    print(CV)
+
     if CV:
         cv_results = cross_validate(clf, x, y, cv=5, return_estimator = True)
         cv_results1 = cross_validate(clf1, x, y, cv=5, return_estimator = True)
@@ -197,12 +205,18 @@ def model(x, y, x_delta, xy_delta):
         gb_regr_scores = cross_val_score(gb_regr, x, y, cv=kfold)
         print("\nGradient Boosted Random Forest: %0.5f (+/- %0.5f)" % (gb_regr_scores.mean(), gb_regr_scores.std() * 2))
 
+        xgb = XGBRegressor(n_estimators=100, learning_rate=0.1, max_depth=3)
+        xgb_scores = cross_val_score(xgb, x, y, cv=kfold)
+        print("\nExtreme Gradient Boosted Regressor: %0.5f (+/- %0.5f)" % (xgb_scores.mean(), xgb_scores.std() * 2))
+
+
         return scores1.mean(), scores1.std() * 2
     else:
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
 
         regr = RandomForestRegressor(n_estimators = 100, random_state=0)
         gb_regr = GradientBoostingRegressor(n_estimators = 100, random_state=0,  max_depth = 5)
+        xgb_regr = XGBRegressor(n_estimators=100, learning_rate=0.1, max_depth=3)
 
         #fitting the models
         clf = clf.fit(x_train, y_train)
@@ -210,6 +224,7 @@ def model(x, y, x_delta, xy_delta):
         clf2 = clf2.fit(x_train, y_train)
         clf3 = regr.fit(x_train, y_train)
         clf4 = gb_regr.fit(x_train, y_train)
+        clf5 = xgb_regr.fit(x_train, y_train)
 
         #predicting the outputs
         pred_y = clf.predict(x_test)
@@ -217,12 +232,14 @@ def model(x, y, x_delta, xy_delta):
         pred_y2 = clf2.predict(x_test)
         pred_y3 = regr.predict(x_test)
         pred_y4 = gb_regr.predict(x_test)
+        pred_y5 = xgb_regr.predict(x_test)
 
         print_performance("Unregularized", y_test, pred_y, clf, x_train, x_delta, xy_delta)
         print_performance("L1", y_test, pred_y1, clf1, x_train, x_delta, xy_delta)
         print_performance("L2", y_test, pred_y2, clf2, x_train, x_delta, xy_delta)
         print("\nRandom Forest", regr.score(x_test, y_test))
         print("\nGradient Boosted Random Forest", gb_regr.score(x_test, y_test))
+        print("\nExtreme Gradient Boosted Regressor", xgb_regr.score(x_test, y_test))
     return None
 
 def print_performance_cv(title, scores, cv_results, cols):
