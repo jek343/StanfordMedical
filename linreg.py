@@ -2,7 +2,6 @@ import csv
 import os
 import sys
 from xgboost import XGBRegressor
-
 '''
 Note: to install xgboost on mac
 git clone --recursive https://github.com/dmlc/xgboost
@@ -23,11 +22,11 @@ import seaborn as sns
 
 DATA_YEAR = 2018
 PREDICT_YEAR = 2019
-X_DELTA = True
-XY_DELTA = True
+X_DELTA = False
+XY_DELTA = False
 CV = True
 
-create_map = False
+create_map = True
 
 predict = "Premature age-adjusted mortality raw value"
 
@@ -205,7 +204,7 @@ def model(x, y, x_delta, xy_delta):
         gb_regr_scores = cross_val_score(gb_regr, x, y, cv=kfold)
         print("\nGradient Boosted Random Forest: %0.5f (+/- %0.5f)" % (gb_regr_scores.mean(), gb_regr_scores.std() * 2))
 
-        xgb = XGBRegressor(n_estimators=100, learning_rate=0.1, max_depth=3)
+        xgb = XGBRegressor(loss = "huber", n_estimators=100, learning_rate=0.1, max_depth=3)
         xgb_scores = cross_val_score(xgb, x, y, cv=kfold)
         print("\nExtreme Gradient Boosted Regressor: %0.5f (+/- %0.5f)" % (xgb_scores.mean(), xgb_scores.std() * 2))
 
@@ -216,7 +215,7 @@ def model(x, y, x_delta, xy_delta):
 
         regr = RandomForestRegressor(n_estimators = 100, random_state=0)
         gb_regr = GradientBoostingRegressor(n_estimators = 100, random_state=0,  max_depth = 5)
-        xgb_regr = XGBRegressor(n_estimators=100, learning_rate=0.1, max_depth=3)
+        xgb_regr = XGBRegressor(loss = "huber", n_estimators=100, learning_rate=0.1, max_depth=3)
 
         #fitting the models
         clf = clf.fit(x_train, y_train)
@@ -292,7 +291,14 @@ def print_performance(title, actual, prediction, clf, train, x_delta, xy_delta):
     plt.clf()
 
 
-
+def categorize_counties():
+    '''Categorizes counties into one of five groups (in relation to predict):
+        1. accelerating
+        2. decelerating
+        3. stable
+        4. increasing
+        5. decreasing'''
+    return
 
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
 P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
@@ -306,7 +312,9 @@ prev_year = remove_rows_cols(prev_year)
 prev_year, curr_year = data_both_years(prev_year, curr_year)
 
 prev_x = get_x(prev_year)
+prev_y = get_y(prev_year)
 curr_y = get_y(curr_year)
+print("\nR^2 between prev y and curr y:", r2_score(curr_y, prev_y))
 
 model(prev_x, curr_y, False, False)
 
@@ -347,11 +355,11 @@ def create_coef_map():
     fig, (ax,ax2) = plt.subplots(ncols=2, figsize=(10, 5))
     fig.subplots_adjust(wspace=0.01)
     sns.heatmap(np.expand_dims(cov_mat_row[:mid], axis=1), ax = ax,
-                cbar=False, annot=True, fmt='.2f', cmap='Reds',
+                cbar=False, annot=True, fmt='.2f', cmap ="Reds",
                 yticklabels=[x[:-10] for x in cols[:mid]],
                 xticklabels=False)
     sns.heatmap(np.expand_dims(cov_mat_row[mid:], axis=1),
-                ax = ax2, cbar=False, annot=True, fmt='.2f', cmap='Blues',
+                ax = ax2, cbar=False, annot=True, fmt='.2f', cmap = "Blues",
                 yticklabels=[x[:-10] for x in cols[mid:]],
                 xticklabels=False)
     ax2.yaxis.tick_right()
@@ -399,7 +407,9 @@ def map_xdeltas():
         ax = sns.heatmap(diff, mask=mask, annot=True, xticklabels=[str(x) for x in DATA_YEARS],
             yticklabels=[str(x) for x in PREDICT_YEARS], fmt="+.3f", cmap = "Greens", vmax=.3, square=True)
     ax.tick_params(rotation=0)
-    plt.title("Improvement from x & y to x deltas & y")
+    plt.title("Improvement from x & y to x deltas + prev y & y")
+    plt.ylabel("Predict Year")
+    plt.xlabel("Data Year")
     plt.savefig("improve.png")
     plt.cla()
 
@@ -432,7 +442,7 @@ def map_xdeltas_r2():
     ax = sns.heatmap(results, cbar=True, annot=True, fmt='+.3f', cmap='Greens',
                 yticklabels=ylabels, xticklabels=False)
     ax.tick_params(rotation=0)
-    plt.title("Improvement from y r2 to x deltas & y")
+    plt.title("Improvement from y r2 to x deltas + prev y & y")
     plt.savefig("improve_r2.png")
     plt.cla()
 
