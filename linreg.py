@@ -355,11 +355,11 @@ def create_coef_map():
     fig, (ax,ax2) = plt.subplots(ncols=2, figsize=(10, 5))
     fig.subplots_adjust(wspace=0.01)
     sns.heatmap(np.expand_dims(cov_mat_row[:mid], axis=1), ax = ax,
-                cbar=False, annot=True, fmt='.2f', cmap ="Reds",
+                cbar=False, annot=True, fmt='.2f', cmap ="YlGnBu",
                 yticklabels=[x[:-10] for x in cols[:mid]],
                 xticklabels=False)
     sns.heatmap(np.expand_dims(cov_mat_row[mid:], axis=1),
-                ax = ax2, cbar=False, annot=True, fmt='.2f', cmap = "Blues",
+                ax = ax2, cbar=False, annot=True, fmt='.2f', cmap = "YlGn_r",
                 yticklabels=[x[:-10] for x in cols[mid:]],
                 xticklabels=False)
     ax2.yaxis.tick_right()
@@ -450,5 +450,5 @@ def map_xdeltas_r2():
 
 if create_map:
     create_coef_map()
-    map_xdeltas()
-    map_xdeltas_r2()
+    # map_xdeltas()
+    # map_xdeltas_r2()
