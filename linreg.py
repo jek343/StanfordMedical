@@ -2,6 +2,7 @@ import csv
 import os
 import sys
 from xgboost import XGBRegressor
+import matplotlib.pyplot as plt
 '''
 Note: to install xgboost on mac
 git clone --recursive https://github.com/dmlc/xgboost
@@ -298,7 +299,41 @@ def categorize_counties():
         3. stable
         4. increasing
         5. decreasing'''
+    categories = {
+        'increasing, accelerating': [],
+        'increasing, decelerating': [],
+        'increasing, linear': [],
+        'decreasing, accelerating': [],
+        'decreasing, decelerating': [],
+        'decreasing, linear': [],
+        'stable': []
+    }
+    years = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
+    mort_df = pd.read_csv("../datasets/mort_data.csv")
+
+    for index, row in mort_df.iterrows():
+        row = row[1:]
+        result = np.polyfit(years, row, deg = 3)
+        print("COEFF", result)
+        first = result[0]
+        second = result[1]
+        if first < .5 and first > -.5:
+            print("no first")
+            if second > 0:
+                print("constantly increasing")
+                categories['increasing, linear'] += [index]
+            elif second < 0:
+                print("constantly decreasing")
+                categories['decreasing, linear'] += [index]
+            else: 
+                print("constant")
+                categories['stable'] += [index]
+        elif first < 0:
+            print("first negative")
+        else:
+            print("first positive")
     return
+
 
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
 P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
@@ -316,7 +351,9 @@ prev_y = get_y(prev_year)
 curr_y = get_y(curr_year)
 print("\nR^2 between prev y and curr y:", r2_score(curr_y, prev_y))
 
-model(prev_x, curr_y, False, False)
+categorize_counties()
+
+# model(prev_x, curr_y, False, False)
 
 if X_DELTA and PREDICT_YEAR != DATA_YEAR:
     delta_X, delta_Y = x_deltas(prev_year, curr_year)
