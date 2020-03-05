@@ -27,7 +27,7 @@ X_DELTA = False
 XY_DELTA = False
 CV = True
 
-create_map = True
+create_map = False
 
 predict = "Premature age-adjusted mortality raw value"
 
@@ -292,6 +292,21 @@ def print_performance(title, actual, prediction, clf, train, x_delta, xy_delta):
     plt.clf()
 
 
+def visualize_mort(mort_df):
+    xp = np.linspace(int(mort_df.columns[0]), int(mort_df.columns[-1]), 100)
+
+    for fips_code in mort_df.index[:30]:
+        coefs, res, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 2, full=True)
+        trendpoly = np.poly1d(coefs) 
+        plt.plot(pd.to_numeric(mort_df.columns),trendpoly(pd.to_numeric(mort_df.columns)))
+        plt.ylim(250, 650)
+        plt.scatter(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code])
+        plt.title(str(np.round(res, 3)))
+        plt.savefig(str(fips_code) + ".png")
+        plt.cla()
+
+visualize_mort(pd.read_csv("../datasets/mort_data.csv", index_col = 0))
+
 def categorize_counties():
     '''Categorizes counties into one of five groups (in relation to predict):
         1. accelerating
@@ -309,29 +324,30 @@ def categorize_counties():
         'stable': []
     }
     years = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
-    mort_df = pd.read_csv("../datasets/mort_data.csv")
+    mort_df = pd.read_csv("../datasets/mort_data.csv", index_col = 0)
 
     for index, row in mort_df.iterrows():
-        row = row[1:]
         result = np.polyfit(years, row, deg = 3)
-        print("COEFF", result)
+        # print("COEFF", result)
         first = result[0]
         second = result[1]
         if first < .5 and first > -.5:
-            print("no first")
+            # print("no first")
             if second > 0:
-                print("constantly increasing")
+                # print("constantly increasing")
                 categories['increasing, linear'] += [index]
             elif second < 0:
-                print("constantly decreasing")
+                # print("constantly decreasing")
                 categories['decreasing, linear'] += [index]
             else: 
-                print("constant")
+                # print("constant")
                 categories['stable'] += [index]
         elif first < 0:
-            print("first negative")
+            pass
+            # print("first negative")
         else:
-            print("first positive")
+            pass
+            # print("first positive")
     return
 
 
@@ -487,5 +503,5 @@ def map_xdeltas_r2():
 
 if create_map:
     create_coef_map()
-    # map_xdeltas()
-    # map_xdeltas_r2()
+    map_xdeltas()
+    map_xdeltas_r2()
