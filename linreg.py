@@ -305,9 +305,21 @@ def visualize_mort(mort_df):
         plt.savefig(str(fips_code) + ".png")
         plt.cla()
 
-visualize_mort(pd.read_csv("../datasets/mort_data.csv", index_col = 0))
 
-def categorize_counties():
+def visualize_ind_mort(mort_df, counties, title):
+    for fips_code in counties:
+        xp = np.linspace(int(mort_df.columns[0]), int(mort_df.columns[-1]), 100)
+        coefs, res, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 2, full=True)
+        trendpoly = np.poly1d(coefs) 
+        plt.plot(pd.to_numeric(mort_df.columns),trendpoly(pd.to_numeric(mort_df.columns)))
+        plt.ylim(250, 650)
+        plt.scatter(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code])
+        plt.title(title + " " + str(fips_code))
+        plt.savefig(title + " " + str(fips_code) + ".png")
+        plt.cla()
+
+
+def categorize_counties(mort_df):
     '''Categorizes counties into one of five groups (in relation to predict):
         1. accelerating
         2. decelerating
@@ -324,32 +336,65 @@ def categorize_counties():
         'stable': []
     }
     years = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
-    mort_df = pd.read_csv("../datasets/mort_data.csv", index_col = 0)
 
-    for index, row in mort_df.iterrows():
-        result = np.polyfit(years, row, deg = 3)
-        # print("COEFF", result)
-        first = result[0]
-        second = result[1]
-        if first < .5 and first > -.5:
-            # print("no first")
-            if second > 0:
-                # print("constantly increasing")
-                categories['increasing, linear'] += [index]
-            elif second < 0:
-                # print("constantly decreasing")
-                categories['decreasing, linear'] += [index]
-            else: 
-                # print("constant")
-                categories['stable'] += [index]
-        elif first < 0:
-            pass
-            # print("first negative")
-        else:
-            pass
-            # print("first positive")
-    return
+    count = 0
+    for fips_code in mort_df.index:
+        # coefs1, res1, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 1, full=True)
+        coefs, res, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 2, full=True)
+        
+        # if res1 < res2:
+        #     print("should use first degree")
+        #     if res1 < 600:
+        #         print(coefs1)
+        if res < 600:
 
+            def eqn(year):
+                return coefs[0] * (year ** 2) + coefs[1] * year + coefs[2]
+            def firstderiv(year):
+                return 2 * coefs[0] * year + coefs[1]
+
+            if coefs[0] < 1 and coefs[0] > -1:
+                # linear
+                if abs(eqn(2013)-eqn(2019)) <= 10:
+                    categories['stable'] += [fips_code]
+                    count += 1
+                elif eqn(2013) < eqn(2016) and eqn(2016) < eqn(2019):
+                    categories['increasing, linear'] += [fips_code]
+                    count += 1
+                elif eqn(2013) > eqn(2016) and eqn(2016) > eqn(2019):
+                    categories['decreasing, linear'] += [fips_code]
+                    count += 1
+            elif eqn(2013) < eqn(2016) and eqn(2016) < eqn(2019):
+                # increasing
+                if firstderiv(2014) < firstderiv(2016) and firstderiv(2016) < firstderiv(2018):
+                    # increasing and accelerating - slope increasing
+                    categories['increasing, accelerating'] += [fips_code]
+                    count += 1
+                # elif secderiv1 < 0 and secderiv2 < 0 and secderiv3 < 0:
+                elif firstderiv(2014) > firstderiv(2016) and firstderiv(2016) > firstderiv(2018):
+                    # increasing and decelerating - slope decreasing
+                    categories['increasing, decelerating'] += [fips_code]
+                    count += 1
+            elif eqn(2013) > eqn(2016) and eqn(2016) > eqn(2019):
+                # decreasing
+                if firstderiv(2014) < firstderiv(2016) and firstderiv(2016) < firstderiv(2018):
+                    # decreasing and decelerating - slope increasing
+                    categories['decreasing, decelerating'] += [fips_code]
+                    count += 1
+                elif firstderiv(2014) > firstderiv(2016) and firstderiv(2016) > firstderiv(2018):
+                    # decreasing and accelerating - slope decreasing
+                    categories['decreasing, accelerating'] += [fips_code]
+                    count += 1
+    print(count)
+    print(categories)
+    return categories
+
+mort_df = pd.read_csv("../datasets/mort_data.csv", index_col = 0)
+# visualize_mort(pd.read_csv("../datasets/mort_data.csv", index_col = 0))
+categories = categorize_counties(mort_df)
+counties = categories['stable'][:10]
+title = "stable"
+visualize_ind_mort(mort_df, counties, title)
 
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
 P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
@@ -366,8 +411,6 @@ prev_x = get_x(prev_year)
 prev_y = get_y(prev_year)
 curr_y = get_y(curr_year)
 print("\nR^2 between prev y and curr y:", r2_score(curr_y, prev_y))
-
-categorize_counties()
 
 # model(prev_x, curr_y, False, False)
 
