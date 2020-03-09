@@ -1,5 +1,6 @@
 import csv
 import os
+import random
 import sys
 from xgboost import XGBRegressor
 import matplotlib.pyplot as plt
@@ -306,17 +307,30 @@ def visualize_mort(mort_df):
         plt.cla()
 
 
-def visualize_ind_mort(mort_df, counties, title):
-    for fips_code in counties:
-        xp = np.linspace(int(mort_df.columns[0]), int(mort_df.columns[-1]), 100)
-        coefs, res, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 2, full=True)
-        trendpoly = np.poly1d(coefs) 
-        plt.plot(pd.to_numeric(mort_df.columns),trendpoly(pd.to_numeric(mort_df.columns)))
-        plt.ylim(250, 650)
-        plt.scatter(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code])
-        plt.title(title + " " + str(fips_code))
-        plt.savefig(title + " " + str(fips_code) + ".png")
-        plt.cla()
+def visualize_ind_mort(mort_df, fips_code, title):
+    # for fips_code in counties:
+    xp = np.linspace(int(mort_df.columns[0]), int(mort_df.columns[-1]), 100)
+    coefs, res, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 2, full=True)
+    trendpoly = np.poly1d(coefs) 
+    plt.plot(pd.to_numeric(mort_df.columns),trendpoly(pd.to_numeric(mort_df.columns)))
+    plt.ylim(250, 650)
+    plt.scatter(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code])
+    plt.title(title + " " + str(fips_code))
+    plt.savefig("trends/" + title + str(fips_code) + ".png")
+    plt.cla()
+
+
+def visualize_rand_mort(mort_df, categorized):
+    categories = ['increasing, accelerating', 'increasing, decelerating', 
+    'increasing, linear', 'decreasing, accelerating', 'decreasing, decelerating', 
+    'decreasing, linear', 'stable']
+
+    for c in categories:
+        counties = categorized[c]
+        for i in range(10):
+            num = random.randint(0, len(counties)-1)
+            fips = counties[num]
+            visualize_ind_mort(mort_df, fips, c)
 
 
 def categorize_counties(mort_df):
@@ -342,17 +356,16 @@ def categorize_counties(mort_df):
         # coefs1, res1, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 1, full=True)
         coefs, res, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 2, full=True)
         
+        def eqn(year):
+            return coefs[0] * (year ** 2) + coefs[1] * year + coefs[2]
+        def firstderiv(year):
+            return 2 * coefs[0] * year + coefs[1]
+
         # if res1 < res2:
         #     print("should use first degree")
         #     if res1 < 600:
         #         print(coefs1)
         if res < 600:
-
-            def eqn(year):
-                return coefs[0] * (year ** 2) + coefs[1] * year + coefs[2]
-            def firstderiv(year):
-                return 2 * coefs[0] * year + coefs[1]
-
             if coefs[0] < 1 and coefs[0] > -1:
                 # linear
                 if abs(eqn(2013)-eqn(2019)) <= 10:
@@ -385,16 +398,13 @@ def categorize_counties(mort_df):
                     # decreasing and accelerating - slope decreasing
                     categories['decreasing, accelerating'] += [fips_code]
                     count += 1
-    # print(count)
-    # print(categories)
     return categories
+
 
 mort_df = pd.read_csv("../datasets/mort_data.csv", index_col = 0)
 # visualize_mort(pd.read_csv("../datasets/mort_data.csv", index_col = 0))
-categories = categorize_counties(mort_df)
-counties = categories['stable'][:10]
-title = "stable"
-visualize_ind_mort(mort_df, counties, title)
+categorized = categorize_counties(mort_df)
+visualize_rand_mort(mort_df, categorized)
 
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
 P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
