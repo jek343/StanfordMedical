@@ -385,8 +385,8 @@ def categorize_counties(mort_df):
                     # decreasing and accelerating - slope decreasing
                     categories['decreasing, accelerating'] += [fips_code]
                     count += 1
-    print(count)
-    print(categories)
+    # print(count)
+    # print(categories)
     return categories
 
 mort_df = pd.read_csv("../datasets/mort_data.csv", index_col = 0)
