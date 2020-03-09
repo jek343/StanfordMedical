@@ -293,22 +293,10 @@ def print_performance(title, actual, prediction, clf, train, x_delta, xy_delta):
     plt.clf()
 
 
-def visualize_mort(mort_df):
-    xp = np.linspace(int(mort_df.columns[0]), int(mort_df.columns[-1]), 100)
-
-    for fips_code in mort_df.index[:30]:
-        coefs, res, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 2, full=True)
-        trendpoly = np.poly1d(coefs) 
-        plt.plot(pd.to_numeric(mort_df.columns),trendpoly(pd.to_numeric(mort_df.columns)))
-        plt.ylim(250, 650)
-        plt.scatter(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code])
-        plt.title(str(np.round(res, 3)))
-        plt.savefig(str(fips_code) + ".png")
-        plt.cla()
-
-
 def visualize_ind_mort(mort_df, fips_code, title):
-    # for fips_code in counties:
+    '''Generates a single graph of mortality over time for the county with the 
+    given FIPS code in the mortality dataframe'''
+
     xp = np.linspace(int(mort_df.columns[0]), int(mort_df.columns[-1]), 100)
     coefs, res, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 2, full=True)
     trendpoly = np.poly1d(coefs) 
@@ -321,10 +309,11 @@ def visualize_ind_mort(mort_df, fips_code, title):
 
 
 def visualize_rand_mort(mort_df, categorized):
+    '''Generates 10 mortality-over-time graphs per category within categorized'''
+
     categories = ['increasing, accelerating', 'increasing, decelerating', 
     'increasing, linear', 'decreasing, accelerating', 'decreasing, decelerating', 
     'decreasing, linear', 'stable']
-
     for c in categories:
         counties = categorized[c]
         for i in range(10):
@@ -334,12 +323,16 @@ def visualize_rand_mort(mort_df, categorized):
 
 
 def categorize_counties(mort_df):
-    '''Categorizes counties into one of five groups (in relation to predict):
-        1. accelerating
-        2. decelerating
-        3. stable
-        4. increasing
-        5. decreasing'''
+    '''Categorizes counties into one of seven groups (in relation to predict):
+        1. increasing, accelerating
+        2. increasing, decelerating
+        3. increasing, linear
+        4. decreasing, accelerating
+        5. decreasing, decelerating
+        6. decreasing, linear
+        7. stable
+    Returns a dictionary with these categories as keys and lists of county fips 
+    codes as the values'''
     categories = {
         'increasing, accelerating': [],
         'increasing, decelerating': [],
@@ -350,10 +343,9 @@ def categorize_counties(mort_df):
         'stable': []
     }
     years = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
+    middle = years[len(years)//2]
 
-    count = 0
     for fips_code in mort_df.index:
-        # coefs1, res1, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 1, full=True)
         coefs, res, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 2, full=True)
         
         def eqn(year):
@@ -361,48 +353,41 @@ def categorize_counties(mort_df):
         def firstderiv(year):
             return 2 * coefs[0] * year + coefs[1]
 
-        # if res1 < res2:
-        #     print("should use first degree")
-        #     if res1 < 600:
-        #         print(coefs1)
         if res < 600:
             if coefs[0] < 1 and coefs[0] > -1:
                 # linear
-                if abs(eqn(2013)-eqn(2019)) <= 10:
+                if abs(eqn(years[0])-eqn(years[-1])) <= 10:
                     categories['stable'] += [fips_code]
-                    count += 1
-                elif eqn(2013) < eqn(2016) and eqn(2016) < eqn(2019):
+                elif eqn(years[0]) < eqn(middle) and eqn(middle) < eqn(years[-1]):
                     categories['increasing, linear'] += [fips_code]
-                    count += 1
-                elif eqn(2013) > eqn(2016) and eqn(2016) > eqn(2019):
+                elif eqn(years[0]) > eqn(middle) and eqn(middle) > eqn(years[-1]):
                     categories['decreasing, linear'] += [fips_code]
-                    count += 1
-            elif eqn(2013) < eqn(2016) and eqn(2016) < eqn(2019):
+            elif eqn(years[0]) < eqn(middle) and eqn(middle) < eqn(years[-1]):
                 # increasing
-                if firstderiv(2014) < firstderiv(2016) and firstderiv(2016) < firstderiv(2018):
+                if firstderiv(years[1]) < firstderiv(middle) and firstderiv(middle) < firstderiv(years[-2]):
                     # increasing and accelerating - slope increasing
                     categories['increasing, accelerating'] += [fips_code]
-                    count += 1
                 # elif secderiv1 < 0 and secderiv2 < 0 and secderiv3 < 0:
-                elif firstderiv(2014) > firstderiv(2016) and firstderiv(2016) > firstderiv(2018):
+                elif firstderiv(years[1]) > firstderiv(middle) and firstderiv(middle) > firstderiv(years[-2]):
                     # increasing and decelerating - slope decreasing
                     categories['increasing, decelerating'] += [fips_code]
-                    count += 1
-            elif eqn(2013) > eqn(2016) and eqn(2016) > eqn(2019):
+            elif eqn(years[0]) > eqn(middle) and eqn(middle) > eqn(years[-1]):
                 # decreasing
-                if firstderiv(2014) < firstderiv(2016) and firstderiv(2016) < firstderiv(2018):
+                if firstderiv(years[1]) < firstderiv(middle) and firstderiv(middle) < firstderiv(years[-2]):
                     # decreasing and decelerating - slope increasing
                     categories['decreasing, decelerating'] += [fips_code]
-                    count += 1
-                elif firstderiv(2014) > firstderiv(2016) and firstderiv(2016) > firstderiv(2018):
+                elif firstderiv(years[1]) > firstderiv(middle) and firstderiv(middle) > firstderiv(years[-2]):
                     # decreasing and accelerating - slope decreasing
                     categories['decreasing, accelerating'] += [fips_code]
-                    count += 1
+
+    count = 0
+    for c, arr in categories.items():
+        count += len(arr)
+    # print(count)
     return categories
 
 
 mort_df = pd.read_csv("../datasets/mort_data.csv", index_col = 0)
-# visualize_mort(pd.read_csv("../datasets/mort_data.csv", index_col = 0))
 categorized = categorize_counties(mort_df)
 visualize_rand_mort(mort_df, categorized)
 
