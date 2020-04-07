@@ -31,7 +31,7 @@ XY_DELTA = False
 CV = True
 DRUG = True
 
-create_map = False
+create_map = True
 
 predict = "Premature age-adjusted mortality raw value"
 
@@ -227,7 +227,7 @@ def model(x, y, x_delta, xy_delta):
     Calls print_performance to print out each model's performance.'''
     clf = LinearRegression()
     clf1 = Lasso(alpha=0.0001, max_iter = 2500, fit_intercept=True)  # l1
-    clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
+    clf2 = Ridge(alpha=0.1, max_iter = 2500, fit_intercept=True)  # l2
 
     if CV:
         cv_results = cross_validate(clf, x, y, cv=5, return_estimator = True)
@@ -510,7 +510,10 @@ def create_coef_map():
     fig.suptitle('Correlation coefficients between features and ' + predict[:-10])
     fig.canvas.draw()
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.savefig("coef.png")
+    if DRUG:
+        plt.savefig("coef_drug.png")
+    else:
+        plt.savefig("coef.png")
     plt.cla()
 
 def map_xdeltas():
@@ -520,6 +523,10 @@ def map_xdeltas():
     CV = True
     DATA_YEARS = [2013, 2014, 2015, 2016, 2017, 2018]
     PREDICT_YEARS = [2019, 2018, 2017, 2016, 2015, 2014]
+    if DRUG:
+        DATA_YEARS = [2013, 2014, 2015, 2016, 2017]
+        PREDICT_YEARS = [2018, 2017, 2016, 2015, 2014]
+        
     diff = np.zeros((6,6))
     mask = np.zeros_like(diff)
 
@@ -533,6 +540,8 @@ def map_xdeltas():
                 curr_year = remove_rows_cols(curr_year)
                 prev_year = remove_rows_cols(prev_year)
                 prev_year, curr_year = data_both_years(prev_year, curr_year)
+                if DRUG:
+                    prev_year, curr_year = drugs_both_years(prev_year, curr_year)
                 prev_x = get_x(prev_year)
                 curr_y = get_y(curr_year)
                 blockPrint()
@@ -550,10 +559,16 @@ def map_xdeltas():
         ax = sns.heatmap(diff, mask=mask, annot=True, xticklabels=[str(x) for x in DATA_YEARS],
             yticklabels=[str(x) for x in PREDICT_YEARS], fmt="+.3f", cmap = "Greens", vmax=.3, square=True)
     ax.tick_params(rotation=0)
-    plt.title("Improvement from x & y to x deltas + prev y & y")
-    plt.ylabel("Predict Year")
-    plt.xlabel("Data Year")
-    plt.savefig("improve.png")
+    if DRUG:
+        plt.title("Drug Improvement from x & y to x deltas + prev y & y")
+        plt.ylabel("Drug Predict Year")
+        plt.xlabel("Drug Data Year")
+        plt.savefig("improve_drug.png")
+    else:
+        plt.title("Improvement from x & y to x deltas + prev y & y")
+        plt.ylabel("Predict Year")
+        plt.xlabel("Data Year")
+        plt.savefig("improve.png")
     plt.cla()
 
 def map_xdeltas_r2():
@@ -563,7 +578,9 @@ def map_xdeltas_r2():
     global CV
     CV = True
     PREDICT_YEARS = [2019, 2018, 2017, 2016, 2015, 2014]
-    results = np.zeros((6,1))
+    if DRUG:
+        PREDICT_YEARS = [2018, 2017, 2016, 2015, 2014]
+    results = np.zeros((len(PREDICT_YEARS),1))
     for p_i, pred_yr in enumerate(PREDICT_YEARS):
         data_yr = pred_yr - 1
         DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(data_yr) + '.csv')
@@ -573,6 +590,8 @@ def map_xdeltas_r2():
         curr_year = remove_rows_cols(curr_year)
         prev_year = remove_rows_cols(prev_year)
         prev_year, curr_year = data_both_years(prev_year, curr_year)
+        if DRUG:
+            prev_year, curr_year = drugs_both_years(prev_year, curr_year)
         delta_X, delta_Y = x_deltas(prev_year, curr_year)
         prev_y = get_y(prev_year)
         curr_y = get_y(curr_year)
@@ -585,8 +604,12 @@ def map_xdeltas_r2():
     ax = sns.heatmap(results, cbar=True, annot=True, fmt='+.3f', cmap='Greens',
                 yticklabels=ylabels, xticklabels=False)
     ax.tick_params(rotation=0)
-    plt.title("Improvement from y r2 to x deltas + prev y & y")
-    plt.savefig("improve_r2.png")
+    if DRUG:
+        plt.title("Drug Improve from y r2 to x deltas + prev y & y")
+        plt.savefig("improve_r2_drug.png")
+    else:
+        plt.title("Improvement from y r2 to x deltas + prev y & y")
+        plt.savefig("improve_r2.png")
     plt.cla()
 
 
