@@ -41,8 +41,17 @@ possible_y = ["Premature death raw value", "Life expectancy raw value",
 
 assert predict in possible_y
 assert DATA_YEAR <= PREDICT_YEAR
-assert DATA_YEAR >= 2013 and DATA_YEAR <= 2019
-assert PREDICT_YEAR >= 2013 and PREDICT_YEAR <= 2019
+
+if X_DELTA or XY_DELTA:
+    assert DATA_YEAR < PREDICT_YEAR
+
+if DRUG:
+    assert DATA_YEAR >= 2013 and DATA_YEAR <= 2018
+    assert PREDICT_YEAR >= 2013 and PREDICT_YEAR <= 2018
+else:
+    assert DATA_YEAR >= 2013 and DATA_YEAR <= 2019
+    assert PREDICT_YEAR >= 2013 and PREDICT_YEAR <= 2019
+
 
 include_features_paper = [predict, "% Rural raw value", "Population raw value",
                     "% Females raw value", "% below 18 years of age raw value",
