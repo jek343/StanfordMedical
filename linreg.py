@@ -18,15 +18,18 @@ from sklearn.model_selection import train_test_split, cross_val_score, cross_val
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
 import numpy as np
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-DATA_YEAR = 2018
-PREDICT_YEAR = 2019
-X_DELTA = False
+DATA_YEAR = 2017
+PREDICT_YEAR = 2018
+X_DELTA = True
 XY_DELTA = False
 CV = True
+DRUG = True
 
 create_map = False
 
@@ -70,10 +73,10 @@ include_features_brfs = [predict,
                     "Insufficient sleep raw value",
                     "Social associations raw value", "% Missing entries"]
 
-def open_csv(path):
-    '''Returns the csv reader for the file at the specified path'''
-    data_csv_file = open(path)
-    return csv.reader(data_csv_file, delimiter=',')
+# def open_csv(path):
+#     '''Returns the csv reader for the file at the specified path'''
+#     data_csv_file = open(path)
+#     return csv.reader(data_csv_file, delimiter=',')
 
 
 def remove_rows_cols(data):
@@ -119,6 +122,40 @@ def data_both_years(prev_year, curr_year):
     prev_year.drop(columns=list(drop_prev), inplace = True)
     curr_year.drop(columns=list(drop_curr), inplace = True)
     return prev_year, curr_year
+
+def drugs_both_years(prev_year, curr_year):
+    D_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'Drug Related Cause of Death, 2013-2018.csv')
+    drug_df = pd.read_csv(D_DATA_PATH)
+    drug_df = drug_df[["County Code", "Year", "Age Adjusted Rate"]]
+    drug_df.drop(index = drug_df[ drug_df["Age Adjusted Rate"] == "Unreliable"].index.values, inplace=True)
+    drug_df.drop(index= drug_df[ drug_df["Age Adjusted Rate"] == "Missing"].index.values, inplace=True)
+    drug_prev = drug_df.loc[drug_df["Year"] == DATA_YEAR]
+    drug_curr = drug_df.loc[drug_df["Year"] == PREDICT_YEAR]
+    drug_prev = drug_prev.drop(columns = ["Year"])
+    drug_curr = drug_curr.drop(columns = ["Year"])
+    drug_prev.set_index("County Code", inplace = True) 
+    drug_curr.set_index("County Code", inplace = True) 
+    # only keep counties that are in both years
+    curr_rows = set(drug_curr.index)
+    prev_rows = set(drug_prev.index)
+    indexes = curr_rows.intersection(prev_rows)
+    drop_curr = curr_rows - indexes
+    drop_prev = prev_rows - indexes
+    drug_prev.drop(index=list(drop_prev), inplace = True)
+    drug_curr.drop(index=list(drop_curr), inplace = True)
+    drug_prev = pd.to_numeric(drug_prev["Age Adjusted Rate"])
+    drug_curr = pd.to_numeric(drug_curr["Age Adjusted Rate"])
+    prev_year.drop(columns=[predict], inplace=True)
+    curr_year.drop(columns=[predict], inplace =True)
+    prev_year = pd.concat([prev_year, drug_prev], axis=1)
+    curr_year = pd.concat([curr_year, drug_curr], axis=1)
+    prev_year = prev_year.rename(columns={"Age Adjusted Rate": predict})
+    curr_year = curr_year.rename(columns={"Age Adjusted Rate": predict})
+    prev_year.dropna(axis='index', inplace = True)
+    curr_year.dropna(axis='index', inplace = True)
+    return prev_year, curr_year
+
+
 
 
 def get_x(year):
@@ -180,7 +217,7 @@ def model(x, y, x_delta, xy_delta):
     forest for unregularized, lasso, and ridge regression.
     Calls print_performance to print out each model's performance.'''
     clf = LinearRegression()
-    clf1 = Lasso(alpha=0.0001, fit_intercept=True)  # l1
+    clf1 = Lasso(alpha=0.0001, max_iter = 2500, fit_intercept=True)  # l1
     clf2 = Ridge(alpha=0.1, fit_intercept=True)  # l2
 
     if CV:
@@ -201,7 +238,7 @@ def model(x, y, x_delta, xy_delta):
         regr = RandomForestRegressor(n_estimators=100, random_state = 0)
         regr_scores = cross_val_score(regr, x, y, cv=kfold)
         print("\nRandom Forest: %0.5f (+/- %0.5f)" % (regr_scores.mean(), regr_scores.std() * 2))
-
+        
         gb_regr = GradientBoostingRegressor(loss = "huber", learning_rate = 0.1, n_estimators=100, random_state = 0, max_depth = 3)
         gb_regr_scores = cross_val_score(gb_regr, x, y, cv=kfold)
         print("\nGradient Boosted Random Forest: %0.5f (+/- %0.5f)" % (gb_regr_scores.mean(), gb_regr_scores.std() * 2))
@@ -251,6 +288,8 @@ def print_performance_cv(title, scores, cv_results, cols):
     d = {}
     for fold in cv_results['estimator']:
         for i, txt in enumerate(fold.coef_):
+            if DRUG:
+                txt = txt.mean()
             if abs(txt) > 0.05:
                 if cols[i] in d:
                     d[cols[i]].append(txt)
@@ -402,12 +441,16 @@ prev_year = remove_rows_cols(prev_year)
 
 prev_year, curr_year = data_both_years(prev_year, curr_year)
 
+if DRUG:
+    prev_year, curr_year = drugs_both_years(prev_year, curr_year)
+
 prev_x = get_x(prev_year)
 prev_y = get_y(prev_year)
 curr_y = get_y(curr_year)
+
 print("\nR^2 between prev y and curr y:", r2_score(curr_y, prev_y))
 
-# model(prev_x, curr_y, False, False)
+model(prev_x, curr_y, False, False)
 
 if X_DELTA and PREDICT_YEAR != DATA_YEAR:
     delta_X, delta_Y = x_deltas(prev_year, curr_year)
