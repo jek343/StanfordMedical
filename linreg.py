@@ -17,6 +17,7 @@ from sklearn.datasets import make_regression
 from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, KFold
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
+from scipy.stats import wilcoxon
 import numpy as np
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -30,8 +31,15 @@ X_DELTA = True
 XY_DELTA = False
 CV = True
 DRUG = True
+NUM_SPLITS = 10 #Note: even if CV = False, this needs to be any number >= 2 but it won't affect the output
 
 create_map = True
+R2S = []
+SCORES1_X_Y = []
+SCORES1_X_DEL = []
+
+
+
 
 predict = "Premature age-adjusted mortality raw value"
 
@@ -41,6 +49,7 @@ possible_y = ["Premature death raw value", "Life expectancy raw value",
 
 assert predict in possible_y
 assert DATA_YEAR <= PREDICT_YEAR
+assert NUM_SPLITS >= 2
 
 if X_DELTA or XY_DELTA:
     assert DATA_YEAR < PREDICT_YEAR
@@ -221,7 +230,7 @@ def xy_deltas(prev_year, curr_year):
     x.fillna(value=0.0, inplace=True)
     return x, y
 
-def model(x, y, x_delta, xy_delta):
+def model(x, y, x_delta, xy_delta, kf):
     '''Evaluates linear regression, random forest, and gradient boosted random
     forest for unregularized, lasso, and ridge regression.
     Calls print_performance to print out each model's performance.'''
@@ -230,9 +239,9 @@ def model(x, y, x_delta, xy_delta):
     clf2 = Ridge(alpha=0.1, max_iter = 2500, fit_intercept=True)  # l2
 
     if CV:
-        cv_results = cross_validate(clf, x, y, cv=5, return_estimator = True)
-        cv_results1 = cross_validate(clf1, x, y, cv=5, return_estimator = True)
-        cv_results2 = cross_validate(clf2, x, y, cv=5, return_estimator = True)
+        cv_results = cross_validate(clf, x, y, cv=kf, return_estimator = True)
+        cv_results1 = cross_validate(clf1, x, y, cv=kf, return_estimator = True)
+        cv_results2 = cross_validate(clf2, x, y, cv=kf, return_estimator = True)
 
         scores = cv_results['test_score']
         scores1 = cv_results1['test_score']
@@ -257,7 +266,7 @@ def model(x, y, x_delta, xy_delta):
         print("\nExtreme Gradient Boosted Regressor: %0.5f (+/- %0.5f)" % (xgb_scores.mean(), xgb_scores.std() * 2))
 
 
-        return scores1.mean(), scores1.std() * 2
+        return scores1
     else:
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
 
@@ -459,20 +468,84 @@ curr_y = get_y(curr_year)
 
 print("\nR^2 between prev y and curr y:", r2_score(curr_y, prev_y))
 
-model(prev_x, curr_y, False, False)
+kf = KFold(n_splits=NUM_SPLITS, random_state = 5)
+
+wil_scores_xy = model(prev_x, curr_y, False, False, kf)
 
 if X_DELTA and PREDICT_YEAR != DATA_YEAR:
     delta_X, delta_Y = x_deltas(prev_year, curr_year)
 
     print("\nX DELTA RESULTS")
-    model(delta_X, delta_Y, True, False)
+    wil_scores_xdel = model(delta_X, delta_Y, True, False, kf)
 
 if XY_DELTA and PREDICT_YEAR != DATA_YEAR:
     xydelta_x, xydelta_y = xy_deltas(prev_year, curr_year)
 
     print("\nXY DELTA RESULTS")
-    model(xydelta_x, xydelta_y, False, True)
+    model(xydelta_x, xydelta_y, False, True, kf)
 
+#-------------------------SIGNIFICANCE TESTING----------------------------------
+def sig_test_wilcoxon():
+    '''Performs the wilcoxon significance test
+    Note: The independent sample parameter is (?) violated due to the samples being drawn
+    from the same dataset to cross validate'''
+    #compare 1: R^2 to x --> y (Method 1)
+    #compare 2: R^2 to x delta + prev y --> y (Method 2)
+    #compare 3: Method 1 to Method 2
+    
+    DATA_YEARS = [2013, 2014, 2015, 2016, 2017, 2018]
+    PREDICT_YEARS = [2019, 2018, 2017, 2016, 2015, 2014]
+    if DRUG:
+        DATA_YEARS = [2013, 2014, 2015, 2016, 2017]
+        PREDICT_YEARS = [2018, 2017, 2016, 2015, 2014]
+    compare_1 = np.zeros((len(PREDICT_YEARS),len(DATA_YEARS)))
+    compare_2 = np.zeros((len(PREDICT_YEARS),len(DATA_YEARS)))
+    compare_3 = np.zeros((len(PREDICT_YEARS),len(DATA_YEARS)))
+    mask = np.zeros_like(compare_1)
+    for p_i, pred_yr in enumerate(PREDICT_YEARS):
+        for d_i, data_yr in enumerate(DATA_YEARS):
+            if data_yr < pred_yr:
+                r2 = [R2S[p_i][d_i] for i in range(NUM_SPLITS)]
+                _, p_1 = wilcoxon(r2, SCORES1_X_Y[p_i][d_i])
+                _, p_2 = wilcoxon(r2, SCORES1_X_DEL[p_i][d_i])
+                _, p_3 = wilcoxon(SCORES1_X_Y[p_i][d_i], SCORES1_X_DEL[p_i][d_i])
+                # print(pred_yr, data_yr, p_1, r2[0], SCORES1_X_Y[p_i][d_i])
+                compare_1[p_i][d_i] = p_1
+                compare_2[p_i][d_i] = p_2
+                compare_3[p_i][d_i] = p_3
+    
+    mask[np.where(compare_1 == 0)] = True #returns lower triangle
+    for c, compare in enumerate([compare_1, compare_2, compare_3]):
+        with sns.axes_style("white"):
+            f, ax = plt.subplots(figsize=(7, 5))
+            ax = sns.heatmap(compare, mask=mask, annot=True, xticklabels=[str(x) for x in DATA_YEARS],
+                yticklabels=[str(x) for x in PREDICT_YEARS], fmt="+.4f", cmap = "Greens" if all(i < 0.05 for row in compare for i in row) else "Reds", vmax=.2, square=True)
+        ax.tick_params(rotation=0)
+        if c == 0:
+            title = "R^2 to x & y"
+        elif c == 1:
+            title = "R^2 to x delta + prev y & y"
+        else:
+            title = "x & y to x delta + prev y & y"
+        if DRUG:
+            plt.title("Drug Wilcoxon from " + title)
+            plt.ylabel("Drug Predict Year")
+            plt.xlabel("Drug Data Year")
+            plt.savefig("compare_drug" + str(c + 1) + ".png")
+        else:
+            plt.title("Wilcoxon from " + title)
+            plt.ylabel("Predict Year")
+            plt.xlabel("Data Year")
+            plt.savefig("compare" + str(c + 1) + ".png")
+        plt.cla()
+
+    # print("ps 1")
+    # print(compare_1)
+    # print("ps 2")
+    # print(compare_2)
+    # print("ps 3")
+    # print(compare_3)  
+    return
 #-------------------------VISUALIZATIONS----------------------------------------
 def blockPrint():
     '''Blocks printing to the terminal'''
@@ -527,10 +600,13 @@ def map_xdeltas():
         DATA_YEARS = [2013, 2014, 2015, 2016, 2017]
         PREDICT_YEARS = [2018, 2017, 2016, 2015, 2014]
         
-    diff = np.zeros((6,6))
+    diff = np.zeros((len(PREDICT_YEARS),len(DATA_YEARS)))
     mask = np.zeros_like(diff)
 
     for p_i, pred_yr in enumerate(PREDICT_YEARS):
+        row_r2 = []
+        row_xy = []
+        row_xdel = []
         for d_i, data_yr in enumerate(DATA_YEARS):
             if data_yr < pred_yr:
                 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(data_yr) + '.csv')
@@ -543,15 +619,26 @@ def map_xdeltas():
                 if DRUG:
                     prev_year, curr_year = drugs_both_years(prev_year, curr_year)
                 prev_x = get_x(prev_year)
+                prev_y = get_y(prev_year)
                 curr_y = get_y(curr_year)
                 blockPrint()
-                mean_xy, std2_xy = model(prev_x, curr_y, False, False)
+                scores1 = model(prev_x, curr_y, False, False, kf)
+                mean_xy = scores1.mean()
+                std2_xy = scores1.std() * 2
                 enablePrint()
                 delta_X, delta_Y = x_deltas(prev_year, curr_year)
                 blockPrint()
-                mean_xdel, std2_xdel = model(delta_X, delta_Y, True, False)
+                scores1_del = model(delta_X, delta_Y, True, False, kf)
+                mean_xdel = scores1_del.mean()
+                std2_xdel = scores1_del.std() * 2
                 enablePrint()
                 diff[p_i, d_i] = mean_xdel - mean_xy
+                row_r2.append(r2_score(curr_y, prev_y))
+                row_xy.append(scores1)
+                row_xdel.append(scores1_del)
+        R2S.append(row_r2)
+        SCORES1_X_Y.append(row_xy)
+        SCORES1_X_DEL.append(row_xdel)
 
     mask[np.where(diff == 0)] = True #returns lower triangle
     with sns.axes_style("white"):
@@ -596,7 +683,9 @@ def map_xdeltas_r2():
         prev_y = get_y(prev_year)
         curr_y = get_y(curr_year)
         blockPrint()
-        mean_xy, std2_xy = model(delta_X, curr_y, True, False)
+        scores1 = model(delta_X, curr_y, True, False, kf)
+        mean_xy = scores1.mean()
+        std2_xy = scores1.std() * 2
         enablePrint()
         results[p_i] = mean_xy - r2_score(curr_y, prev_y)
     fig, ax = plt.subplots(figsize=(5, 7))
@@ -614,7 +703,8 @@ def map_xdeltas_r2():
 
 
 
-if create_map:
-    create_coef_map()
+if create_map and CV:
+    # create_coef_map()
     map_xdeltas()
-    map_xdeltas_r2()
+    sig_test_wilcoxon()
+    # map_xdeltas_r2()
