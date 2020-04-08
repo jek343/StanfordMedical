@@ -91,11 +91,6 @@ include_features_brfs = [predict,
                     "Insufficient sleep raw value",
                     "Social associations raw value", "% Missing entries"]
 
-# def open_csv(path):
-#     '''Returns the csv reader for the file at the specified path'''
-#     data_csv_file = open(path)
-#     return csv.reader(data_csv_file, delimiter=',')
-
 
 def remove_rows_cols(data):
     '''Renames row indexes to fips code unique identifier, drops counties that
@@ -141,14 +136,14 @@ def data_both_years(prev_year, curr_year):
     curr_year.drop(columns=list(drop_curr), inplace = True)
     return prev_year, curr_year
 
-def drugs_both_years(prev_year, curr_year):
+def drugs_both_years(prev_year, curr_year, data_year, predict_year):
     D_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'Drug Related Cause of Death, 2013-2018.csv')
     drug_df = pd.read_csv(D_DATA_PATH)
     drug_df = drug_df[["County Code", "Year", "Age Adjusted Rate"]]
     drug_df.drop(index = drug_df[ drug_df["Age Adjusted Rate"] == "Unreliable"].index.values, inplace=True)
     drug_df.drop(index= drug_df[ drug_df["Age Adjusted Rate"] == "Missing"].index.values, inplace=True)
-    drug_prev = drug_df.loc[drug_df["Year"] == DATA_YEAR]
-    drug_curr = drug_df.loc[drug_df["Year"] == PREDICT_YEAR]
+    drug_prev = drug_df.loc[drug_df["Year"] == data_year]
+    drug_curr = drug_df.loc[drug_df["Year"] == predict_year]
     drug_prev = drug_prev.drop(columns = ["Year"])
     drug_curr = drug_curr.drop(columns = ["Year"])
     drug_prev.set_index("County Code", inplace = True) 
@@ -460,7 +455,7 @@ prev_year = remove_rows_cols(prev_year)
 prev_year, curr_year = data_both_years(prev_year, curr_year)
 
 if DRUG:
-    prev_year, curr_year = drugs_both_years(prev_year, curr_year)
+    prev_year, curr_year = drugs_both_years(prev_year, curr_year, DATA_YEAR, PREDICT_YEAR)
 
 prev_x = get_x(prev_year)
 prev_y = get_y(prev_year)
@@ -492,7 +487,6 @@ def sig_test_wilcoxon():
     #compare 1: R^2 to x --> y (Method 1)
     #compare 2: R^2 to x delta + prev y --> y (Method 2)
     #compare 3: Method 1 to Method 2
-    
     DATA_YEARS = [2013, 2014, 2015, 2016, 2017, 2018]
     PREDICT_YEARS = [2019, 2018, 2017, 2016, 2015, 2014]
     if DRUG:
@@ -501,29 +495,36 @@ def sig_test_wilcoxon():
     compare_1 = np.zeros((len(PREDICT_YEARS),len(DATA_YEARS)))
     compare_2 = np.zeros((len(PREDICT_YEARS),len(DATA_YEARS)))
     compare_3 = np.zeros((len(PREDICT_YEARS),len(DATA_YEARS)))
+    compareg_1 = np.zeros((len(PREDICT_YEARS),len(DATA_YEARS)))
+    compareg_2 = np.zeros((len(PREDICT_YEARS),len(DATA_YEARS)))
+    compareg_3 = np.zeros((len(PREDICT_YEARS),len(DATA_YEARS)))
     mask = np.zeros_like(compare_1)
     for p_i, pred_yr in enumerate(PREDICT_YEARS):
         for d_i, data_yr in enumerate(DATA_YEARS):
             if data_yr < pred_yr:
-                r2 = [R2S[p_i][d_i] for i in range(NUM_SPLITS)]
-                _, p_1 = wilcoxon(r2, SCORES1_X_Y[p_i][d_i])
-                _, p_2 = wilcoxon(r2, SCORES1_X_DEL[p_i][d_i])
-                _, p_3 = wilcoxon(SCORES1_X_Y[p_i][d_i], SCORES1_X_DEL[p_i][d_i])
-                # print(pred_yr, data_yr, p_1, r2[0], SCORES1_X_Y[p_i][d_i])
+                _, p_1 = wilcoxon(SCORES1_X_Y[p_i][d_i] - R2S[p_i][d_i])
+                _, p_2 = wilcoxon(SCORES1_X_DEL[p_i][d_i] - R2S[p_i][d_i])
+                _, p_3 = wilcoxon(SCORES1_X_DEL[p_i][d_i] - SCORES1_X_Y[p_i][d_i])
+                _, pg_1 = wilcoxon(SCORES1_X_Y[p_i][d_i] - R2S[p_i][d_i], alternative = 'greater')
+                _, pg_2 = wilcoxon(SCORES1_X_DEL[p_i][d_i] - R2S[p_i][d_i], alternative = 'greater')
+                _, pg_3 = wilcoxon(SCORES1_X_DEL[p_i][d_i] - SCORES1_X_Y[p_i][d_i], alternative = 'greater')
                 compare_1[p_i][d_i] = p_1
                 compare_2[p_i][d_i] = p_2
                 compare_3[p_i][d_i] = p_3
+                compareg_1[p_i][d_i] = pg_1
+                compareg_2[p_i][d_i] = pg_2
+                compareg_3[p_i][d_i] = pg_3
     
     mask[np.where(compare_1 == 0)] = True #returns lower triangle
-    for c, compare in enumerate([compare_1, compare_2, compare_3]):
+    for c, compare in enumerate([compare_1, compare_2, compare_3, compareg_1, compareg_2, compareg_3]):
         with sns.axes_style("white"):
             f, ax = plt.subplots(figsize=(7, 5))
             ax = sns.heatmap(compare, mask=mask, annot=True, xticklabels=[str(x) for x in DATA_YEARS],
                 yticklabels=[str(x) for x in PREDICT_YEARS], fmt="+.4f", cmap = "Greens" if all(i < 0.05 for row in compare for i in row) else "Reds", vmax=.2, square=True)
         ax.tick_params(rotation=0)
-        if c == 0:
+        if c == 0 or c == 3:
             title = "R^2 to x & y"
-        elif c == 1:
+        elif c == 1 or c == 4:
             title = "R^2 to x delta + prev y & y"
         else:
             title = "x & y to x delta + prev y & y"
@@ -531,20 +532,19 @@ def sig_test_wilcoxon():
             plt.title("Drug Wilcoxon from " + title)
             plt.ylabel("Drug Predict Year")
             plt.xlabel("Drug Data Year")
-            plt.savefig("compare_drug" + str(c + 1) + ".png")
+            if c <=2:
+                plt.savefig("compare_drug" + str(c + 1) + ".png")
+            else:
+                plt.savefig("compareg_drug" + str(c + 1) + ".png")
         else:
             plt.title("Wilcoxon from " + title)
             plt.ylabel("Predict Year")
             plt.xlabel("Data Year")
-            plt.savefig("compare" + str(c + 1) + ".png")
-        plt.cla()
-
-    # print("ps 1")
-    # print(compare_1)
-    # print("ps 2")
-    # print(compare_2)
-    # print("ps 3")
-    # print(compare_3)  
+            if c <=2:
+                plt.savefig("compare" + str(c + 1) + ".png")
+            else:
+                plt.savefig("compareg" + str(c + 1) + ".png")
+        plt.cla() 
     return
 #-------------------------VISUALIZATIONS----------------------------------------
 def blockPrint():
@@ -617,7 +617,7 @@ def map_xdeltas():
                 prev_year = remove_rows_cols(prev_year)
                 prev_year, curr_year = data_both_years(prev_year, curr_year)
                 if DRUG:
-                    prev_year, curr_year = drugs_both_years(prev_year, curr_year)
+                    prev_year, curr_year = drugs_both_years(prev_year, curr_year, data_yr, pred_yr)
                 prev_x = get_x(prev_year)
                 prev_y = get_y(prev_year)
                 curr_y = get_y(curr_year)
@@ -678,7 +678,7 @@ def map_xdeltas_r2():
         prev_year = remove_rows_cols(prev_year)
         prev_year, curr_year = data_both_years(prev_year, curr_year)
         if DRUG:
-            prev_year, curr_year = drugs_both_years(prev_year, curr_year)
+            prev_year, curr_year = drugs_both_years(prev_year, curr_year, data_yr, pred_yr)
         delta_X, delta_Y = x_deltas(prev_year, curr_year)
         prev_y = get_y(prev_year)
         curr_y = get_y(curr_year)
@@ -690,7 +690,7 @@ def map_xdeltas_r2():
         results[p_i] = mean_xy - r2_score(curr_y, prev_y)
     fig, ax = plt.subplots(figsize=(5, 7))
     ylabels = np.array([str(y) for y in PREDICT_YEARS])
-    ax = sns.heatmap(results, cbar=True, annot=True, fmt='+.3f', cmap='Greens',
+    ax = sns.heatmap(results, cbar=True, annot=True, fmt='+.3f', cmap='Reds',
                 yticklabels=ylabels, xticklabels=False)
     ax.tick_params(rotation=0)
     if DRUG:
@@ -704,7 +704,7 @@ def map_xdeltas_r2():
 
 
 if create_map and CV:
-    # create_coef_map()
+    create_coef_map()
     map_xdeltas()
     sig_test_wilcoxon()
-    # map_xdeltas_r2()
+    map_xdeltas_r2()
