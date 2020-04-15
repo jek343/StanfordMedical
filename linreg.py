@@ -494,6 +494,15 @@ def broad_categorize_counties(mort_df, years, show_uncategorized):
 
 def create_category_csv(mort_df, categorized, categories, years, path, 
 uncategorized=None, include_uncategorized=False):
+    '''Generates a csv file with the following statistics for 
+    the categories specificed: 
+    ['Category', 'Number of Counties', 'Average Mortality', 
+    'First Quartile', 'Median Mortality', 'Third Quartile', 
+    'Average Change', 'Largest Change', 'County with Largest Change']
+
+    Includes a category 'uncategorized' if uncategorized is given and 
+    include_uncategorized is True
+    '''
     cols = ['Category', 'Number of Counties', 'Average Mortality', 
     'First Quartile', 'Median Mortality', 'Third Quartile', 
     'Average Change', 'Largest Change', 'County with Largest Change']
@@ -552,16 +561,16 @@ uncategorized=None, include_uncategorized=False):
 
 mort_df = pd.read_csv("../datasets/mort_data.csv", index_col = 0)
 years = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
-# categorized, uncategorized = categorize_counties(mort_df, years, show_uncategorized = True)
-categorized, uncategorized = broad_categorize_counties(mort_df, years, show_uncategorized = True)
+categorized, uncategorized = categorize_counties(mort_df, years, show_uncategorized = True)
+# categorized, uncategorized = broad_categorize_counties(mort_df, years, show_uncategorized = True)
 
 if create_category_info:
     print("\n\nGENERATING CATEGORY INFO\n\n")
-    # categories = ['increasing, accelerating', 'increasing, decelerating', 
-    # 'increasing, linear', 'decreasing, accelerating', 'decreasing, decelerating', 
-    # 'decreasing, linear', 'stable']
-    categories = ['increasing', 'decreasing', 'stable']
-    path = 'category_stats/broader_stats_with_uncategorized.csv'
+    categories = ['increasing, accelerating', 'increasing, decelerating', 
+    'increasing, linear', 'decreasing, accelerating', 'decreasing, decelerating', 
+    'decreasing, linear', 'stable']
+    # categories = ['increasing', 'decreasing', 'stable']
+    path = 'category_stats/stats_with_uncategorized.csv'
     create_category_csv(mort_df, categorized, categories, years, path, uncategorized, True)
     # visualize_rand_mort(mort_df, categorized, categories)
 
