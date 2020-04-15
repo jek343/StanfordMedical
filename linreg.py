@@ -27,13 +27,14 @@ import seaborn as sns
 
 DATA_YEAR = 2017
 PREDICT_YEAR = 2018
-X_DELTA = True
+X_DELTA = False
 XY_DELTA = False
-CV = True
-DRUG = True
+CV = False
+DRUG = False
 NUM_SPLITS = 10 #Note: even if CV = False, this needs to be any number >= 2 but it won't affect the output
 
-create_map = True
+create_map = False
+create_category_info = True
 R2S = []
 SCORES1_X_Y = []
 SCORES1_X_DEL = []
@@ -360,12 +361,9 @@ def visualize_ind_mort(mort_df, fips_code, title):
     plt.cla()
 
 
-def visualize_rand_mort(mort_df, categorized):
+def visualize_rand_mort(mort_df, categorized, categories):
     '''Generates 10 mortality-over-time graphs per category within categorized'''
 
-    categories = ['increasing, accelerating', 'increasing, decelerating', 
-    'increasing, linear', 'decreasing, accelerating', 'decreasing, decelerating', 
-    'decreasing, linear', 'stable']
     for c in categories:
         counties = categorized[c]
         for i in range(10):
@@ -374,7 +372,7 @@ def visualize_rand_mort(mort_df, categorized):
             visualize_ind_mort(mort_df, fips, c)
 
 
-def categorize_counties(mort_df):
+def categorize_counties(mort_df, years, show_uncategorized):
     '''Categorizes counties into one of seven groups (in relation to predict):
         1. increasing, accelerating
         2. increasing, decelerating
@@ -383,8 +381,10 @@ def categorize_counties(mort_df):
         5. decreasing, decelerating
         6. decreasing, linear
         7. stable
-    Returns a dictionary with these categories as keys and lists of county fips 
-    codes as the values'''
+    If show_uncategorized is False, returns a dictionary with these categories 
+    as keys and lists of county fips codes as the values
+    If show_uncategorized is True, returns the aforementioned dictionary and a 
+    list of the FIPS codes of uncategorized counties without clear trends'''
     categories = {
         'increasing, accelerating': [],
         'increasing, decelerating': [],
@@ -394,7 +394,7 @@ def categorize_counties(mort_df):
         'decreasing, linear': [],
         'stable': []
     }
-    years = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
+    uncategorized = []
     middle = years[len(years)//2]
 
     for fips_code in mort_df.index:
@@ -431,17 +431,139 @@ def categorize_counties(mort_df):
                 elif firstderiv(years[1]) > firstderiv(middle) and firstderiv(middle) > firstderiv(years[-2]):
                     # decreasing and accelerating - slope decreasing
                     categories['decreasing, accelerating'] += [fips_code]
+            else:
+                uncategorized += [fips_code]
+        else:
+            uncategorized += [fips_code]
 
     count = 0
     for c, arr in categories.items():
         count += len(arr)
-    # print(count)
+    
+    if show_uncategorized:
+        return categories, uncategorized
+    
     return categories
 
 
+def broad_categorize_counties(mort_df, years, show_uncategorized):
+    '''Categorizes counties into one of three (in relation to predict):
+        1. increasing
+        2. decreasing
+        3. stable
+    If show_uncategorized is False, returns a dictionary with these categories 
+    as keys and lists of county fips codes as the values
+    If show_uncategorized is True, returns the aforementioned dictionary and a 
+    list of the FIPS codes of uncategorized counties without clear trends'''
+    categories = {
+        'increasing': [],
+        'decreasing': [],
+        'stable': []
+    }
+    uncategorized = []
+
+    middle = years[len(years)//2]
+
+    for fips_code in mort_df.index:
+        coefs, res, _, _, _ = np.polyfit(pd.to_numeric(mort_df.columns), mort_df.loc[fips_code], deg = 2, full=True)
+        
+        def eqn(year):
+            return coefs[0] * (year ** 2) + coefs[1] * year + coefs[2]
+        def firstderiv(year):
+            return 2 * coefs[0] * year + coefs[1]
+
+        if res < 600:
+            if abs(eqn(years[0])-eqn(years[-1])) <= 10:
+                categories['stable'] += [fips_code]
+            elif eqn(years[0]) < eqn(middle) and eqn(middle) < eqn(years[-1]):
+                # increasing
+                categories['increasing'] += [fips_code]
+            elif eqn(years[0]) > eqn(middle) and eqn(middle) > eqn(years[-1]):
+                # decreasing
+                categories['decreasing'] += [fips_code]
+            else:
+                uncategorized += [fips_code]
+        else:
+            uncategorized += [fips_code]
+
+    if show_uncategorized:
+        return categories, uncategorized
+    
+    return categories
+
+
+def create_category_csv(mort_df, categorized, categories, years, path, 
+uncategorized=None, include_uncategorized=False):
+    cols = ['Category', 'Number of Counties', 'Average Mortality', 
+    'First Quartile', 'Median Mortality', 'Third Quartile', 
+    'Average Change', 'Largest Change', 'County with Largest Change']
+    df = pd.DataFrame(columns=cols)
+
+    if include_uncategorized:
+        categories += ['uncategorized']
+        categorized.update({'uncategorized' : uncategorized})
+
+    for c in categories:
+        counties = mort_df.loc[categorized[c]]
+        num_counties = len(counties)
+        
+        # find median & quartiles of average mortalities
+        average_morts = counties.mean(axis=1)
+        quartiles = average_morts.quantile([0.25, 0.50, 0.75])
+        ave_mort = average_morts.mean()
+
+        # find ranges
+        mort_changes = counties.loc[ : , str(years[-1])] - counties.loc[ : , str(years[0])]
+        mort_changes.columns = ['changes']
+        ave_change = mort_changes.mean()
+        mort_changes.sort_values(inplace=True)
+
+        first = mort_changes.index[0], mort_changes.iloc[0]
+        last = mort_changes.index[mort_changes.size-1], mort_changes.iloc[mort_changes.size-1]
+        if c == 'stable' or c == 'uncategorized':
+            if abs(last[1]) > abs(first[1]):
+                largest_change = last
+            else:
+                largest_change = first 
+            smallest_change = mort_changes.iloc[mort_changes.size//2]
+        elif mort_changes.iloc[0] > 0:
+            largest_change = last
+            smallest_change = first
+        else:
+            largest_change = first
+            smallest_change = last
+
+        category_stats = {
+            'Category' : c,
+            'Number of Counties' : [num_counties],
+            'Average Mortality' : [ave_mort],
+            'First Quartile' : [quartiles.loc[0.25]],
+            'Median Mortality' : [quartiles.loc[0.50]],
+            'Third Quartile' : [quartiles.loc[0.75]],
+            'Average Change' : [ave_change],
+            'Largest Change' : [largest_change[1]],
+            'County with Largest Change' : [largest_change[0]]
+        }
+        row = pd.DataFrame.from_dict(category_stats)
+        df = pd.concat([df, row])
+    
+    df.to_csv(path, index=False)
+
+
 mort_df = pd.read_csv("../datasets/mort_data.csv", index_col = 0)
-categorized = categorize_counties(mort_df)
-visualize_rand_mort(mort_df, categorized)
+years = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
+# categorized, uncategorized = categorize_counties(mort_df, years, show_uncategorized = True)
+categorized, uncategorized = broad_categorize_counties(mort_df, years, show_uncategorized = True)
+
+if create_category_info:
+    print("\n\nGENERATING CATEGORY INFO\n\n")
+    # categories = ['increasing, accelerating', 'increasing, decelerating', 
+    # 'increasing, linear', 'decreasing, accelerating', 'decreasing, decelerating', 
+    # 'decreasing, linear', 'stable']
+    categories = ['increasing', 'decreasing', 'stable']
+    path = 'category_stats/broader_stats_with_uncategorized.csv'
+    create_category_csv(mort_df, categorized, categories, years, path, uncategorized, True)
+    # visualize_rand_mort(mort_df, categorized, categories)
 
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
 P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
