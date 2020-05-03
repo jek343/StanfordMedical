@@ -11,7 +11,7 @@ cd xgboost; cp make/minimum.mk ./config.mk; make -j4
 cd python-package; python setup.py develop --user
 '''
 from sklearn import preprocessing
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, RidgeCV,  LassoCV
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, RidgeCV,  LassoCV, LogisticRegressionCV
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.datasets import make_regression
 from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, KFold
@@ -27,14 +27,14 @@ import seaborn as sns
 
 DATA_YEAR = 2017
 PREDICT_YEAR = 2018
-X_DELTA = False
+X_DELTA = True
 XY_DELTA = False
-CV = False
-DRUG = False
+CV = True
+DRUG = True
 NUM_SPLITS = 10 #Note: even if CV = False, this needs to be any number >= 2 but it won't affect the output
 
 create_map = False
-create_category_info = True
+create_category_info = False
 R2S = []
 SCORES1_X_Y = []
 SCORES1_X_DEL = []
@@ -558,11 +558,52 @@ uncategorized=None, include_uncategorized=False):
     
     df.to_csv(path, index=False)
 
+def log_reg_data(delta_X, inc_fips, dec_fips):
+    '''Sets up data for logistic regression'''
+    inc_idx = list(set(inc_fips).intersection(set(delta_X.index)))
+    dec_idx = list(set(dec_fips).intersection(set(delta_X.index)))
+    print(inc_idx)
+    inc = pd.concat([pd.DataFrame(delta_X.loc[inc_idx]), pd.DataFrame([1] * len(inc_idx))], axis=1)
+    dec = pd.concat([pd.DataFrame(delta_X.loc[dec_idx]), pd.DataFrame([0] * len(dec_idx))], axis=1)
+    total = pd.concat([inc, dec], axis=0)
+    #shuffles
+    total = total.sample(frac=1).reset_index(drop=True)
+    return total
+
+
+def log_reg(data, kf):
+    '''Takes in matrix (rows are fips, columns are deltas in an x variable.
+    Two labels, increasing drug mortality (1) or decreasing drug mortality (2).
+    10-fold cv. 'l1' norm. Returns coefficients. Pos coef mean increases in that 
+    variable are more associated with class 1 (v.v.). '''
+    X = data.iloc[:,:-1] 
+    #need to get rid of mortality
+    y = data.iloc[:,-1]
+    clf = LogisticRegressionCV(cv=kf).fit(X.iloc[:int(0.8*data.shape[0]),:], y.iloc[:int(0.8*data.shape[0]),:])
+    acc = clf.score(X.iloc[int(0.8*data.shape[0]):, :], y.iloc[int(0.8*data.shape[0]):, :])
+    return acc, clf.coef_, X.columns
+
+def print_log_results(acc, coef, cols):
+    print("\nLogistic Reg: " + str(round(acc, 5)))
+    coef = np.array(coef)
+    greater_coef = [j for (i,j) in zip(coef,cols) if i > 0]
+    neg_coef = [j for (i,j) in zip(coef,cols) if i < 0]
+    greater_coef.sort(reverse=True)
+    neg_coef.sort()
+    for (i,j) in greater_coef[:10]:
+        print(i,j)
+    for (i,j) in neg_coef[:10]:
+        print(i,j)
+    return greater_coef, neg_coef
+
+
+
+
 
 mort_df = pd.read_csv("../datasets/mort_data.csv", index_col = 0)
 years = [2013, 2014, 2015, 2016, 2017, 2018, 2019]
-categorized, uncategorized = categorize_counties(mort_df, years, show_uncategorized = True)
-# categorized, uncategorized = broad_categorize_counties(mort_df, years, show_uncategorized = True)
+# categorized, uncategorized = categorize_counties(mort_df, years, show_uncategorized = True)
+categorized, uncategorized = broad_categorize_counties(mort_df, years, show_uncategorized = True)
 
 if create_category_info:
     print("\n\nGENERATING CATEGORY INFO\n\n")
@@ -603,6 +644,13 @@ if X_DELTA and PREDICT_YEAR != DATA_YEAR:
 
     print("\nX DELTA RESULTS")
     wil_scores_xdel = model(delta_X, delta_Y, True, False, kf)
+
+    print("\n--------------Log Reg-----------------")
+    log_data = log_reg_data(delta_X, categorized["increasing"], categorized["decreasing"])
+    print(log_data.head())
+    acc, coef, cols = log_reg(log_data, kf)
+    greater_coef, neg_coef = print_log_results(acc, coef, cols)
+    print("\n--------------End Log Reg-----------------")
 
 if XY_DELTA and PREDICT_YEAR != DATA_YEAR:
     xydelta_x, xydelta_y = xy_deltas(prev_year, curr_year)
