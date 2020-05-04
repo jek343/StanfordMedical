@@ -562,12 +562,15 @@ def log_reg_data(delta_X, inc_fips, dec_fips):
     '''Sets up data for logistic regression'''
     inc_idx = list(set(inc_fips).intersection(set(delta_X.index)))
     dec_idx = list(set(dec_fips).intersection(set(delta_X.index)))
-    print(inc_idx)
-    inc = pd.concat([pd.DataFrame(delta_X.loc[inc_idx]), pd.DataFrame([1] * len(inc_idx))], axis=1)
-    dec = pd.concat([pd.DataFrame(delta_X.loc[dec_idx]), pd.DataFrame([0] * len(dec_idx))], axis=1)
+    inc_x = pd.DataFrame(delta_X.loc[inc_idx]).drop(columns = [predict])
+    dec_x = pd.DataFrame(delta_X.loc[dec_idx]).drop(columns = [predict])
+    inc_y = pd.DataFrame([1] * len(inc_idx), index=inc_idx, columns=['Category'])
+    dec_y = pd.DataFrame([0] * len(dec_idx), index=dec_idx, columns=['Category'])
+    inc = pd.concat([inc_x, inc_y], axis=1)
+    dec = pd.concat([dec_x, dec_y], axis=1)
     total = pd.concat([inc, dec], axis=0)
     #shuffles
-    total = total.sample(frac=1).reset_index(drop=True)
+    total = total.sample(frac=1)
     return total
 
 
@@ -647,7 +650,7 @@ if X_DELTA and PREDICT_YEAR != DATA_YEAR:
 
     print("\n--------------Log Reg-----------------")
     log_data = log_reg_data(delta_X, categorized["increasing"], categorized["decreasing"])
-    print(log_data.head())
+    # print(log_data.head())
     acc, coef, cols = log_reg(log_data, kf)
     greater_coef, neg_coef = print_log_results(acc, coef, cols)
     print("\n--------------End Log Reg-----------------")
