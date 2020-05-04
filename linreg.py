@@ -580,17 +580,19 @@ def log_reg(data, kf):
     10-fold cv. 'l1' norm. Returns coefficients. Pos coef mean increases in that 
     variable are more associated with class 1 (v.v.). '''
     X = data.iloc[:,:-1] 
-    #need to get rid of mortality
     y = data.iloc[:,-1]
-    clf = LogisticRegressionCV(cv=kf).fit(X.iloc[:int(0.8*data.shape[0]),:], y.iloc[:int(0.8*data.shape[0]),:])
-    acc = clf.score(X.iloc[int(0.8*data.shape[0]):, :], y.iloc[int(0.8*data.shape[0]):, :])
-    return acc, clf.coef_, X.columns
+    ltr = int(0.8*data.shape[0])
+    X_tr = X.iloc[:ltr,:]
+    y_tr = y.iloc[:ltr]
+    clf = LogisticRegressionCV(cv=kf, max_iter=2000).fit(X, y)
+    # acc = clf.score(X.iloc[ltr:, :], y.iloc[ltr:])
+    return clf.scores_, clf.coef_, X.columns
 
 def print_log_results(acc, coef, cols):
-    print("\nLogistic Reg: " + str(round(acc, 5)))
+    print("\nLogistic Reg: " + str(acc))
     coef = np.array(coef)
-    greater_coef = [j for (i,j) in zip(coef,cols) if i > 0]
-    neg_coef = [j for (i,j) in zip(coef,cols) if i < 0]
+    greater_coef = [(i,j) for i,j in zip(coef.T,cols) if i > 0]
+    neg_coef = [(i,j) for i,j in zip(coef.T,cols) if i < 0]
     greater_coef.sort(reverse=True)
     neg_coef.sort()
     for (i,j) in greater_coef[:10]:
