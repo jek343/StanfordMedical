@@ -589,7 +589,13 @@ def log_reg(data, kf):
     return clf.scores_, clf.coef_, X.columns
 
 def print_log_results(acc, coef, cols):
-    print("\nLogistic Reg: " + str(acc))
+    print("\nLogistic Reg: \n")
+    # Ref: https://www.pluralsight.com/guides/validating-machine-learning-models-scikit-learn
+    for index, fold in enumerate(acc[1]):
+        print ('Average Accuracy for Fold ' + str(index + 1) + ': ', fold.mean())
+    # Ref: https://stackoverflow.com/questions/36271166/how-to-get-comparable-and-reproducible-results-from-logisticregressioncv-and-gri
+    print ('Best Mean Score Over All the Folds: ', acc[1].mean().mean())
+    print('\n')
     coef = np.array(coef)
     greater_coef = [(i,j) for i,j in zip(coef.T,cols) if i > 0]
     neg_coef = [(i,j) for i,j in zip(coef.T,cols) if i < 0]
