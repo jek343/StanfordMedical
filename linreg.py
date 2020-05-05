@@ -607,6 +607,20 @@ def print_log_results(acc, coef, cols):
         print(i,j)
     return greater_coef, neg_coef
 
+def log_reg_year_combos(data):
+    DATA_YEARS = [2013, 2014, 2015, 2016, 2017]
+    PREDICT_YEARS = [2014, 2015, 2016, 2017, 2018]
+
+    pos = set(data.columns) # have to remove category column still
+    neg = set(data.columns) # have to remove category column still
+
+    for data_yr in DATA_YEARS:
+        for pred_yr in PREDICT_YEARS:
+            if pred_yr < data_yr:
+                # get labels with positive and negative coefficients
+                pass
+
+
 
 
 
@@ -661,6 +675,7 @@ if X_DELTA and PREDICT_YEAR != DATA_YEAR:
     # print(log_data.head())
     acc, coef, cols = log_reg(log_data, kf)
     greater_coef, neg_coef = print_log_results(acc, coef, cols)
+    log_reg_year_combos(log_data)
     print("\n--------------End Log Reg-----------------")
 
 if XY_DELTA and PREDICT_YEAR != DATA_YEAR:
