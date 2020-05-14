@@ -472,7 +472,7 @@ def broad_categorize_counties(mort_df, years, show_uncategorized):
         def firstderiv(year):
             return 2 * coefs[0] * year + coefs[1]
 
-        if res < 800:
+        if res < 850:
             if abs(eqn(years[0])-eqn(years[-1])) <= 15:
                 categories['stable'] += [fips_code]
             elif eqn(years[0]) < eqn(middle) and eqn(middle) < eqn(years[-1]):
@@ -666,7 +666,7 @@ if create_category_info:
     categories = ['increasing', 'decreasing', 'stable']
     path = 'category_stats/broader_stats_with_uncategorized.csv'
     create_category_csv(mort_df, categorized, categories, years, path, uncategorized, True)
-    # visualize_rand_mort(mort_df, categorized, categories)
+    visualize_rand_mort(mort_df, categorized, categories)
     print("\n\nSAVED CATEGORY CSV: " + path + "\n\n")
 
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
