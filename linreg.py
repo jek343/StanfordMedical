@@ -30,7 +30,7 @@ PREDICT_YEAR = 2018
 X_DELTA = True
 XY_DELTA = False
 CV = True
-DRUG = True
+DRUG = False
 NUM_SPLITS = 10 #Note: even if CV = False, this needs to be any number >= 2 but it won't affect the output
 
 create_map = False
@@ -562,8 +562,15 @@ def log_reg_data(delta_X, inc_fips, dec_fips):
     '''Sets up data for logistic regression'''
     inc_idx = list(set(inc_fips).intersection(set(delta_X.index)))
     dec_idx = list(set(dec_fips).intersection(set(delta_X.index)))
-    inc_x = pd.DataFrame(delta_X.loc[inc_idx]).drop(columns = [predict])
-    dec_x = pd.DataFrame(delta_X.loc[dec_idx]).drop(columns = [predict])
+    print(len(inc_idx))
+    print(len(dec_idx))
+    #balance classes
+    # inc_idx = inc_idx[:min(len(inc_idx), len(dec_idx))]
+    # dec_idx = dec_idx[:min(len(inc_idx), len(dec_idx))]
+    # print(len(inc_idx))
+    # print(len(dec_idx))
+    inc_x = pd.DataFrame(delta_X.loc[inc_idx])#.drop(columns = [predict])
+    dec_x = pd.DataFrame(delta_X.loc[dec_idx])#.drop(columns = [predict])
     inc_y = pd.DataFrame([1] * len(inc_idx), index=inc_idx, columns=['Category'])
     dec_y = pd.DataFrame([0] * len(dec_idx), index=dec_idx, columns=['Category'])
     inc = pd.concat([inc_x, inc_y], axis=1)
@@ -582,9 +589,29 @@ def log_reg(data, kf):
     X = data.iloc[:,:-1] 
     y = data.iloc[:,-1]
     ltr = int(0.8*data.shape[0])
-    X_tr = X.iloc[:ltr,:]
-    y_tr = y.iloc[:ltr]
-    clf = LogisticRegressionCV(cv=kf, max_iter=2000).fit(X, y)
+    # X_tr = X.iloc[:ltr,:]
+    # y_tr = y.iloc[:ltr]
+    clf = LogisticRegressionCV(cv=kf, max_iter=2000, penalty = 'l1', solver='saga').fit(X, y)
+    # clfl2 = LogisticRegressionCV(cv=kf, max_iter=10000, solver='sag').fit(X, y)
+    # clfn = LogisticRegressionCV(cv=kf, max_iter=1000, solver='newton-cg').fit(X, y)
+    # clfe = LogisticRegressionCV(cv=kf, max_iter=2000, penalty = 'elasticnet', solver='saga').fit(X, y)
+    # print("l1:")
+    # print(clf.scores_[1].mean().mean())
+    # print("l2:")
+    # print(clfl2.scores_[1].mean().mean())
+    # print("l2 newton:")
+    # print(clfn.scores_[1].mean().mean())
+    # print(clf.predict(X.iloc[ltr:, :]))
+    # print(list(y.iloc[ltr:]))
+    # clf = LinearRegression()
+    # cv_results = cross_validate(clf, X, y, cv=kf, return_estimator = True)
+    # scores = cv_results['test_score']
+    # print(cv_results['training_score'])
+    # estimator = cv_results['estimator']
+    # print(scores)
+    # for model in estimator:
+    #     print(model.coef_)
+    # return scores, estimator, X.columns
     # acc = clf.score(X.iloc[ltr:, :], y.iloc[ltr:])
     return clf.scores_, clf.coef_, X.columns
 
@@ -596,6 +623,7 @@ def print_log_results(acc, coef, cols):
     # Ref: https://stackoverflow.com/questions/36271166/how-to-get-comparable-and-reproducible-results-from-logisticregressioncv-and-gri
     print ('Best Mean Score Over All the Folds: ', acc[1].mean().mean())
     print('\n')
+    # print(acc)
     coef = np.array(coef)
     greater_coef = [(i,j) for i,j in zip(coef.T,cols) if i > 0]
     neg_coef = [(i,j) for i,j in zip(coef.T,cols) if i < 0]
@@ -666,6 +694,8 @@ wil_scores_xy = model(prev_x, curr_y, False, False, kf)
 
 if X_DELTA and PREDICT_YEAR != DATA_YEAR:
     delta_X, delta_Y = x_deltas(prev_year, curr_year)
+    print("DELTA X SHAPE")
+    print(delta_X.shape)
 
     print("\nX DELTA RESULTS")
     wil_scores_xdel = model(delta_X, delta_Y, True, False, kf)
@@ -675,7 +705,7 @@ if X_DELTA and PREDICT_YEAR != DATA_YEAR:
     # print(log_data.head())
     acc, coef, cols = log_reg(log_data, kf)
     greater_coef, neg_coef = print_log_results(acc, coef, cols)
-    log_reg_year_combos(log_data)
+    # log_reg_year_combos(log_data)
     print("\n--------------End Log Reg-----------------")
 
 if XY_DELTA and PREDICT_YEAR != DATA_YEAR:
@@ -909,7 +939,7 @@ def map_xdeltas_r2():
 
 
 if create_map and CV:
-    create_coef_map()
+    # create_coef_map()
     map_xdeltas()
     sig_test_wilcoxon()
-    map_xdeltas_r2()
+    # map_xdeltas_r2()
