@@ -34,7 +34,7 @@ DRUG = False
 NUM_SPLITS = 10 #Note: even if CV = False, this needs to be any number >= 2 but it won't affect the output
 
 create_map = False
-create_category_info = False
+create_category_info = True
 R2S = []
 SCORES1_X_Y = []
 SCORES1_X_DEL = []
@@ -472,8 +472,8 @@ def broad_categorize_counties(mort_df, years, show_uncategorized):
         def firstderiv(year):
             return 2 * coefs[0] * year + coefs[1]
 
-        if res < 600:
-            if abs(eqn(years[0])-eqn(years[-1])) <= 10:
+        if res < 800:
+            if abs(eqn(years[0])-eqn(years[-1])) <= 15:
                 categories['stable'] += [fips_code]
             elif eqn(years[0]) < eqn(middle) and eqn(middle) < eqn(years[-1]):
                 # increasing
@@ -660,13 +660,14 @@ categorized, uncategorized = broad_categorize_counties(mort_df, years, show_unca
 
 if create_category_info:
     print("\n\nGENERATING CATEGORY INFO\n\n")
-    categories = ['increasing, accelerating', 'increasing, decelerating', 
-    'increasing, linear', 'decreasing, accelerating', 'decreasing, decelerating', 
-    'decreasing, linear', 'stable']
-    # categories = ['increasing', 'decreasing', 'stable']
-    path = 'category_stats/stats_with_uncategorized.csv'
+    # categories = ['increasing, accelerating', 'increasing, decelerating', 
+    # 'increasing, linear', 'decreasing, accelerating', 'decreasing, decelerating', 
+    # 'decreasing, linear', 'stable']
+    categories = ['increasing', 'decreasing', 'stable']
+    path = 'category_stats/broader_stats_with_uncategorized.csv'
     create_category_csv(mort_df, categorized, categories, years, path, uncategorized, True)
     # visualize_rand_mort(mort_df, categorized, categories)
+    print("\n\nSAVED CATEGORY CSV: " + path + "\n\n")
 
 DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(DATA_YEAR) + '.csv')
 P_DATA_PATH = os.path.join(os.getcwd(),  '..', 'datasets', 'super_clean_analytic_data' + str(PREDICT_YEAR) + '.csv')
